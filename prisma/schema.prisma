@@ -1,0 +1,239 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================
+// Enums
+// ============================
+
+enum UserRole {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+  PENDING_VERIFICATION
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+  SYSTEM
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+enum RoomType {
+  DIRECT
+  GROUP
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+enum NotificationType {
+  MESSAGE
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  MENTION
+  SYSTEM
+}
+
+// ============================
+// Models
+// ============================
+
+model User {
+  id                String     @id @default(cuid())
+  email             String     @unique
+  username          String     @unique
+  displayName       String
+  passwordHash      String
+  avatar            String?
+  bio               String?
+  role              UserRole   @default(USER)
+  status            UserStatus @default(PENDING_VERIFICATION)
+  isOnline          Boolean    @default(false)
+  lastSeenAt        DateTime?
+  emailVerified     Boolean    @default(false)
+  emailVerifyToken  String?
+  passwordResetToken    String?
+  passwordResetExpires  DateTime?
+  refreshToken      String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  // Relations
+  sentMessages      Message[]         @relation("SentMessages")
+  roomMembers       RoomMember[]
+  sentFriendRequests   Friendship[]   @relation("Requester")
+  receivedFriendRequests Friendship[] @relation("Addressee")
+  notifications     Notification[]
+  messageReactions  MessageReaction[]
+  readReceipts      ReadReceipt[]
+
+  @@map("users")
+}
+
+model Room {
+  id          String    @id @default(cuid())
+  name        String?
+  description String?
+  avatar      String?
+  type        RoomType  @default(DIRECT)
+  isPrivate   Boolean   @default(false)
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  members     RoomMember[]
+  messages    Message[]
+
+  @@map("rooms")
+}
+
+model RoomMember {
+  id          String    @id @default(cuid())
+  roomId      String
+  userId      String
+  isAdmin     Boolean   @default(false)
+  isMuted     Boolean   @default(false)
+  mutedUntil  DateTime?
+  joinedAt    DateTime  @default(now())
+  lastReadAt  DateTime?
+
+  room        Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@map("room_members")
+}
+
+model Message {
+  id          String        @id @default(cuid())
+  content     String?
+  type        MessageType   @default(TEXT)
+  status      MessageStatus @default(SENT)
+  roomId      String
+  senderId    String
+  replyToId   String?
+  isEdited    Boolean       @default(false)
+  isDeleted   Boolean       @default(false)
+  deletedAt   DateTime?
+  editedAt    DateTime?
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  room        Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender      User          @relation("SentMessages", fields: [senderId], references: [id])
+  replyTo     Message?      @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies     Message[]     @relation("MessageReplies")
+  attachments MessageAttachment[]
+  reactions   MessageReaction[]
+  readReceipts ReadReceipt[]
+
+  @@index([roomId, createdAt(sort: Desc)])
+  @@index([senderId])
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id          String    @id @default(cuid())
+  messageId   String
+  url         String
+  name        String
+  mimeType    String
+  size        Int
+  width       Int?
+  height      Int?
+  duration    Int?
+  createdAt   DateTime  @default(now())
+
+  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("message_attachments")
+}
+
+model MessageReaction {
+  id          String    @id @default(cuid())
+  messageId   String
+  userId      String
+  emoji       String
+  createdAt   DateTime  @default(now())
+
+  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@map("message_reactions")
+}
+
+model ReadReceipt {
+  id          String    @id @default(cuid())
+  messageId   String
+  userId      String
+  readAt      DateTime  @default(now())
+
+  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("read_receipts")
+}
+
+model Friendship {
+  id          String           @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  requester   User             @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee   User             @relation("Addressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@map("friendships")
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType
+  title       String
+  body        String
+  data        Json?
+  isRead      Boolean          @default(false)
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
