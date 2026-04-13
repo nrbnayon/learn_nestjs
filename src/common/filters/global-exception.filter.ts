@@ -7,7 +7,10 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { Prisma } from '@prisma/client';
+import {
+  PrismaClientKnownRequestError,
+  PrismaClientValidationError,
+} from '@prisma/client/runtime/library';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -36,14 +39,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         if (errors) message = 'Validation failed';
         code = resp.error ?? this.getErrorCode(status);
       }
-    } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+    } else if (exception instanceof PrismaClientKnownRequestError) {
+      const prismaError = exception;
       status = HttpStatus.BAD_REQUEST;
-      code = `PRISMA_${exception.code}`;
+      code = `PRISMA_${prismaError.code}`;
 
-      switch (exception.code) {
+      switch (prismaError.code) {
         case 'P2002':
           status = HttpStatus.CONFLICT;
-          message = `A record with this ${(exception.meta?.target as string[])?.join(', ')} already exists`;
+          message = `A record with this ${(prismaError.meta?.target as string[])?.join(', ')} already exists`;
           code = 'DUPLICATE_ENTRY';
           break;
         case 'P2025':
@@ -58,7 +62,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         default:
           message = 'Database operation failed';
       }
-    } else if (exception instanceof Prisma.PrismaClientValidationError) {
+    } else if (exception instanceof PrismaClientValidationError) {
       status = HttpStatus.BAD_REQUEST;
       message = 'Invalid data provided';
       code = 'VALIDATION_ERROR';

@@ -8,6 +8,7 @@ export const envValidationSchema = Joi.object({
   PORT: Joi.number().default(3000),
   APP_NAME: Joi.string().default('NestJS Chat Backend'),
   API_PREFIX: Joi.string().default('api/v1'),
+  APP_BASE_URL: Joi.string().uri().default('http://localhost:3000'),
 
   // Database
   DATABASE_URL: Joi.string().required(),
