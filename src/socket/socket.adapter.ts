@@ -63,7 +63,8 @@ export class SocketIoAdapter extends IoAdapter {
         this.logger.debug(`Socket authenticated: userId=${payload.sub}`);
         next();
       } catch (error) {
-        this.logger.warn(`Socket authentication failed: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Socket authentication failed: ${message}`);
         next(new Error('Unauthorized'));
       }
     });

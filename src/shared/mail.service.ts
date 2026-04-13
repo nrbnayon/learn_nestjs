@@ -46,7 +46,8 @@ export class MailService {
       });
       this.logger.log(`Email sent: ${info.messageId}`);
     } catch (error) {
-      this.logger.error(`Failed to send email to ${options.to}: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to send email to ${options.to}: ${message}`);
       throw error;
     }
   }
@@ -57,7 +58,8 @@ export class MailService {
       this.logger.log('Mail server connection verified');
       return true;
     } catch (error) {
-      this.logger.warn(`Mail server verification failed: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Mail server verification failed: ${message}`);
       return false;
     }
   }

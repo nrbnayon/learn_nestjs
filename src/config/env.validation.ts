@@ -43,10 +43,10 @@ export const envValidationSchema = Joi.object({
   STORAGE_DRIVER: Joi.string().valid('local', 's3').default('local'),
   UPLOAD_DIR: Joi.string().default('uploads'),
   MAX_FILE_SIZE: Joi.number().default(10485760),
-  AWS_ACCESS_KEY_ID: Joi.string().optional(),
-  AWS_SECRET_ACCESS_KEY: Joi.string().optional(),
+  AWS_ACCESS_KEY_ID: Joi.string().allow('').optional(),
+  AWS_SECRET_ACCESS_KEY: Joi.string().allow('').optional(),
   AWS_REGION: Joi.string().default('us-east-1'),
-  AWS_S3_BUCKET: Joi.string().optional(),
+  AWS_S3_BUCKET: Joi.string().allow('').optional(),
 
   // Queue
   QUEUE_REDIS_HOST: Joi.string().default('localhost'),

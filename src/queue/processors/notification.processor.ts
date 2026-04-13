@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { QUEUE_NAMES } from '../queue.module';
+import { QUEUE_NAMES } from '../queue.constants';
 import { PrismaService } from '../../database/prisma.service';
 import { SendNotificationJobData } from '../queue.service';
 
@@ -29,7 +29,8 @@ export class NotificationProcessor extends WorkerHost {
 
       this.logger.log(`✅ Notification persisted for user ${job.data.userId}`);
     } catch (error) {
-      this.logger.error(`❌ Failed to process notification for user ${job.data.userId}`, error.stack);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`❌ Failed to process notification for user ${job.data.userId}`, stack);
       throw error;
     }
   }

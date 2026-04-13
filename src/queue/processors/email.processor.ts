@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { QUEUE_NAMES } from '../queue.module';
+import { QUEUE_NAMES } from '../queue.constants';
 import { MailService } from '../../shared/mail.service';
 import { SendEmailJobData } from '../queue.service';
 
@@ -25,7 +25,8 @@ export class EmailProcessor extends WorkerHost {
       });
       this.logger.log(`✅ Email sent to ${job.data.to}`);
     } catch (error) {
-      this.logger.error(`❌ Failed to send email to ${job.data.to}`, error.stack);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`❌ Failed to send email to ${job.data.to}`, stack);
       throw error; // Re-throw to trigger BullMQ retry
     }
   }

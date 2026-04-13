@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { QUEUE_NAMES } from './queue.module';
+import { QUEUE_NAMES } from './queue.constants';
 
 export interface SendEmailJobData {
   to: string;

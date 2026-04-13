@@ -68,7 +68,8 @@ export class StorageService {
       await fsp.unlink(filePath);
       this.logger.debug(`File deleted: ${filePath}`);
     } catch (err) {
-      this.logger.warn(`Could not delete file ${filePath}: ${err.message}`);
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Could not delete file ${filePath}: ${message}`);
     }
   }
 

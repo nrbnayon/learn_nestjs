@@ -29,14 +29,14 @@ export class JwtHelperService {
   generateAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.secret'),
-      expiresIn: this.configService.get<string>('jwt.expiresIn', '7d'),
+      expiresIn: this.configService.get<string>('jwt.expiresIn', '7d') as any,
     });
   }
 
   generateRefreshToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.refreshSecret'),
-      expiresIn: this.configService.get<string>('jwt.refreshExpiresIn', '30d'),
+      expiresIn: this.configService.get<string>('jwt.refreshExpiresIn', '30d') as any,
     });
   }
 

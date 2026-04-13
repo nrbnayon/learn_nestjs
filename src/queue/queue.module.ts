@@ -1,15 +1,11 @@
-import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { QueueService } from './queue.service';
+import { QUEUE_NAMES } from './queue.constants';
 import { EmailProcessor } from './processors/email.processor';
 import { NotificationProcessor } from './processors/notification.processor';
-
-export const QUEUE_NAMES = {
-  EMAIL: 'email',
-  NOTIFICATION: 'notification',
-} as const;
+import { MailService } from '../shared/mail.service';
 
 @Global()
 @Module({
@@ -45,7 +41,7 @@ export const QUEUE_NAMES = {
       { name: QUEUE_NAMES.NOTIFICATION },
     ),
   ],
-  providers: [QueueService, EmailProcessor, NotificationProcessor],
+  providers: [QueueService, EmailProcessor, NotificationProcessor, MailService],
   exports: [QueueService, BullModule],
 })
 export class QueueModule {}

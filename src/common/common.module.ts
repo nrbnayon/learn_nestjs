@@ -8,7 +8,7 @@ import { WsAuthGuard } from './guards/ws-auth.guard';
 
 @Global()
 @Module({
-  imports: [ConfigModule, JwtModule, PrismaModule],
+  imports: [ConfigModule, JwtModule.register({}), PrismaModule],
   providers: [AuthGuard, RolesGuard, WsAuthGuard],
   exports: [AuthGuard, RolesGuard, WsAuthGuard],
 })
