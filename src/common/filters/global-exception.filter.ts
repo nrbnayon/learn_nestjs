@@ -6,7 +6,6 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
@@ -18,8 +17,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const response = ctx.getResponse<{ status: (code: number) => { send: (body: unknown) => void } }>();
+    const request = ctx.getRequest<{ url: string; method: string }>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
@@ -93,7 +92,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       `[${request.method}] ${request.url} → ${status} | ${message}`,
     );
 
-    response.status(status).json(responseBody);
+    response.status(status).send(responseBody);
   }
 
   private getErrorCode(status: number): string {

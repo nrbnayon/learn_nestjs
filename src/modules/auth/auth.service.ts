@@ -75,7 +75,7 @@ export class AuthService {
     });
 
     // Send welcome + verification emails via queue
-    const baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:3000');
+    const baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:8080');
     await this.queueService.sendWelcomeEmail({ email: user.email, displayName: user.displayName });
     await this.queueService.sendVerificationEmail(
       { email: user.email, displayName: user.displayName },
@@ -217,7 +217,7 @@ export class AuthService {
       data: { passwordResetToken: resetToken, passwordResetExpires: resetExpires },
     });
 
-    const baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:3000');
+    const baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:8080');
     await this.queueService.sendPasswordResetEmail(
       { email: user.email, displayName: user.displayName },
       resetToken,

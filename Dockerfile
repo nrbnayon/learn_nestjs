@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN corepack enable
 
-COPY package.json ./
+COPY package.json yarn.lock ./
 RUN yarn install
 
 COPY . .
@@ -18,7 +18,7 @@ ENV NODE_ENV=production
 
 RUN corepack enable
 
-COPY package.json ./
+COPY package.json yarn.lock ./
 RUN yarn install --production
 
 COPY --from=builder /app/dist ./dist

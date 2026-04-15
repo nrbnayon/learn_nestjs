@@ -52,7 +52,7 @@ docker-compose logs -f app
 docker-compose down
 ```
 
-**That's it!** Your backend is running at `http://localhost:3000/api/v1/health`
+**That's it!** Your backend is running at `http://localhost:8080/api/v1/health`
 
 #### Useful Docker Commands
 
@@ -145,7 +145,7 @@ yarn start:dev
 ```env
 # Application
 NODE_ENV=development
-PORT=3000
+PORT=8080
 
 # Database
 DATABASE_URL="postgresql://postgres:1234@localhost:5432/nestjs_chat_db?schema=public"
@@ -171,7 +171,7 @@ JWT_REFRESH_EXPIRES_IN=30d
 
 ## 🔌 API Endpoints
 
-Base URL: `http://localhost:3000/api/v1/`
+Base URL: `http://localhost:8080/api/v1/`
 
 ```
 Auth:
@@ -212,7 +212,7 @@ Health:
 → Check: docker-compose.yml environment variables
 ```
 
-**"Port 3000 already in use"**
+**"Port 8080 already in use"**
 ```powershell
 docker-compose down
 # or change port in docker-compose.yml

@@ -2,9 +2,9 @@ export default () => ({
   app: {
     name: process.env.APP_NAME || 'NestJS Chat Backend',
     nodeEnv: process.env.NODE_ENV || 'development',
-    port: parseInt(process.env.PORT || '3000', 10),
+    port: parseInt(process.env.PORT || '8080', 10),
     apiPrefix: process.env.API_PREFIX || 'api/v1',
-    baseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
+    baseUrl: process.env.APP_BASE_URL || 'http://localhost:8080',
   },
   database: {
     url: process.env.DATABASE_URL,

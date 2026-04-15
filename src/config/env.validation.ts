@@ -5,10 +5,10 @@ export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'production', 'test', 'staging')
     .default('development'),
-  PORT: Joi.number().default(3000),
+  PORT: Joi.number().default(8080),
   APP_NAME: Joi.string().default('NestJS Chat Backend'),
   API_PREFIX: Joi.string().default('api/v1'),
-  APP_BASE_URL: Joi.string().uri().default('http://localhost:3000'),
+  APP_BASE_URL: Joi.string().uri().default('http://localhost:8080'),
 
   // Database
   DATABASE_URL: Joi.string().required(),

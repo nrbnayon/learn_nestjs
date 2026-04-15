@@ -1,8 +1,9 @@
-import compression from 'compression';
-import cookieParser from 'cookie-parser';
-import helmet from 'helmet';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import fastifyHelmet from '@fastify/helmet';
+import fastifyCompress from '@fastify/compress';
+import fastifyCookie from '@fastify/cookie';
 import { AppModule } from './app.module';
 import { CustomValidationPipe } from './common/pipes/validation.pipe';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -11,9 +12,13 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { SocketIoAdapter } from './socket/socket.adapter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    bufferLogs: true,
-  });
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter(),
+    {
+      bufferLogs: true,
+    },
+  );
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port', 3000);
@@ -26,15 +31,15 @@ async function bootstrap() {
     credentials: true,
   });
 
-  app.use(helmet());
-  app.use(compression());
-  app.use(cookieParser());
+  await app.register(fastifyHelmet);
+  await app.register(fastifyCompress);
+  await app.register(fastifyCookie);
 
   app.useGlobalPipes(new CustomValidationPipe());
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(new LoggingInterceptor(), new TransformInterceptor());
   app.useWebSocketAdapter(new SocketIoAdapter(app, configService));
 
-  await app.listen(port, '0.0.0.0');
+  await app.listen({ port, host: '0.0.0.0' });
 }
 bootstrap();
