@@ -31,7 +31,8 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: "postgresql://postgres:1234@postgres:5432/nestjs_chat_db?schema=public"
+      DB_HOST: postgres
       REDIS_HOST: redis
       QUEUE_REDIS_HOST: redis
     depends_on:

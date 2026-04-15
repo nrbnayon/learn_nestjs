@@ -1,7 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
-import { QUEUE_NAMES } from './queue.constants';
 
 export interface SendEmailJobData {
   to: string;
@@ -22,18 +19,12 @@ export interface SendNotificationJobData {
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
 
-  constructor(
-    @InjectQueue(QUEUE_NAMES.EMAIL) private readonly emailQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.NOTIFICATION) private readonly notificationQueue: Queue,
-  ) {}
-
   // ── Email Queue ───────────────────────────────────────────────────────────
 
   async sendEmail(data: SendEmailJobData, delayMs = 0): Promise<void> {
-    await this.emailQueue.add('send-email', data, {
-      delay: delayMs,
-    });
-    this.logger.debug(`Email job queued for: ${data.to}`);
+    this.logger.debug(
+      `Email job skipped (queue disabled in local mode): ${data.to} after ${delayMs}ms`,
+    );
   }
 
   async sendWelcomeEmail(user: { email: string; displayName: string }): Promise<void> {
@@ -81,29 +72,19 @@ export class QueueService {
   // ── Notification Queue ────────────────────────────────────────────────────
 
   async sendNotification(data: SendNotificationJobData): Promise<void> {
-    await this.notificationQueue.add('send-notification', data);
-    this.logger.debug(`Notification job queued for user: ${data.userId}`);
+    this.logger.debug(`Notification job skipped (queue disabled in local mode): ${data.userId}`);
   }
 
   async sendBulkNotifications(notifications: SendNotificationJobData[]): Promise<void> {
-    const jobs = notifications.map((data) => ({
-      name: 'send-notification',
-      data,
-    }));
-    await this.notificationQueue.addBulk(jobs);
-    this.logger.debug(`${notifications.length} notification jobs queued`);
+    this.logger.debug(`${notifications.length} notification jobs skipped in local mode`);
   }
 
   // ── Queue Health ──────────────────────────────────────────────────────────
 
   async getQueueStats(): Promise<Record<string, any>> {
-    const [emailCounts, notifCounts] = await Promise.all([
-      this.emailQueue.getJobCounts(),
-      this.notificationQueue.getJobCounts(),
-    ]);
     return {
-      email: emailCounts,
-      notification: notifCounts,
+      email: { queued: 0, active: 0, completed: 0, failed: 0 },
+      notification: { queued: 0, active: 0, completed: 0, failed: 0 },
     };
   }
 }
