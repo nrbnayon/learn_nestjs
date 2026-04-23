@@ -47,6 +47,8 @@ services:
       DB_HOST: postgres
       REDIS_HOST: redis
       QUEUE_REDIS_HOST: redis
+      PORT: 8080
+      APP_HOST: 0.0.0.0
     depends_on:
       postgres:
         condition: service_healthy

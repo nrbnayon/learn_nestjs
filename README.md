@@ -95,6 +95,9 @@ docker-compose down -v
    DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/nestjs_chat_db?schema=public"
    DB_HOST=localhost
    REDIS_HOST=localhost
+    PORT=3001
+    APP_HOST=127.0.0.1
+    APP_BASE_URL=http://localhost:3001
    ```
 
 4. **Start the app**
@@ -145,7 +148,9 @@ yarn start:dev
 ```env
 # Application
 NODE_ENV=development
-PORT=8080
+PORT=3001
+APP_HOST=127.0.0.1
+APP_BASE_URL=http://localhost:3001
 
 # Database
 DATABASE_URL="postgresql://postgres:1234@localhost:5432/nestjs_chat_db?schema=public"
@@ -171,7 +176,8 @@ JWT_REFRESH_EXPIRES_IN=30d
 
 ## 🔌 API Endpoints
 
-Base URL: `http://localhost:8080/api/v1/`
+Base URL: `http://localhost:8080/api/v1/` for Docker
+Base URL: `http://localhost:3001/api/v1/` for local dev
 
 ```
 Auth:
@@ -215,7 +221,7 @@ Health:
 **"Port 8080 already in use"**
 ```powershell
 docker-compose down
-# or change port in docker-compose.yml
+# or change PORT in .env for local development
 ```
 
 **Containers keep restarting**

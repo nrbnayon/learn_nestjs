@@ -1,6 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyCompress from '@fastify/compress';
 import fastifyCookie from '@fastify/cookie';
@@ -22,8 +25,11 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port', 3000);
+  const host = configService.get<string>('app.host', '127.0.0.1');
   const apiPrefix = configService.get<string>('app.apiPrefix', 'api/v1');
-  const corsOrigins = configService.get<string[]>('cors.origins') ?? ['http://localhost:3000'];
+  const corsOrigins = configService.get<string[]>('cors.origins') ?? [
+    'http://localhost:3000',
+  ];
 
   app.setGlobalPrefix(apiPrefix);
   app.enableCors({
@@ -37,9 +43,12 @@ async function bootstrap() {
 
   app.useGlobalPipes(new CustomValidationPipe());
   app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalInterceptors(new LoggingInterceptor(), new TransformInterceptor());
+  app.useGlobalInterceptors(
+    new LoggingInterceptor(),
+    new TransformInterceptor(),
+  );
   app.useWebSocketAdapter(new SocketIoAdapter(app, configService));
 
-  await app.listen({ port, host: '0.0.0.0' });
+  await app.listen({ port, host });
 }
-bootstrap();
+void bootstrap();
