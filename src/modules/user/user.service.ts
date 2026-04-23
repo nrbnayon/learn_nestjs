@@ -4,15 +4,18 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 const userSelect = {
 	id: true,
+	fullName: true,
 	email: true,
+	phone: true,
 	username: true,
-	displayName: true,
 	avatar: true,
 	bio: true,
 	role: true,
 	status: true,
+	tenantId: true,
 	isOnline: true,
-	emailVerified: true,
+	isEmailVerified: true,
+	isPhoneVerified: true,
 	lastSeenAt: true,
 	createdAt: true,
 	updatedAt: true,
@@ -23,12 +26,12 @@ export class UserService {
 	constructor(private readonly prisma: PrismaService) {}
 
 	async listUsers(search?: string) {
-		return this.prisma.user.findMany({
+		return (this.prisma as any).user.findMany({
 			where: search
 				? {
 						OR: [
 							{ username: { contains: search, mode: 'insensitive' } },
-							{ displayName: { contains: search, mode: 'insensitive' } },
+							{ fullName: { contains: search, mode: 'insensitive' } },
 							{ email: { contains: search, mode: 'insensitive' } },
 						],
 					}
@@ -39,7 +42,7 @@ export class UserService {
 	}
 
 	async getUserById(userId: string) {
-		const user = await this.prisma.user.findUnique({
+		const user = await (this.prisma as any).user.findUnique({
 			where: { id: userId },
 			select: userSelect,
 		});
@@ -57,7 +60,7 @@ export class UserService {
 		}
 
 		if (dto.username) {
-			const existing = await this.prisma.user.findFirst({
+			const existing = await (this.prisma as any).user.findFirst({
 				where: {
 					username: dto.username,
 					NOT: { id: userId },
@@ -69,10 +72,10 @@ export class UserService {
 			}
 		}
 
-		return this.prisma.user.update({
+		return (this.prisma as any).user.update({
 			where: { id: userId },
 			data: {
-				displayName: dto.displayName,
+				fullName: dto.displayName,
 				username: dto.username,
 				avatar: dto.avatar,
 				bio: dto.bio,
@@ -82,7 +85,7 @@ export class UserService {
 	}
 
 	async setPresence(userId: string, isOnline: boolean): Promise<void> {
-		await this.prisma.user.update({
+		await (this.prisma as any).user.update({
 			where: { id: userId },
 			data: {
 				isOnline,

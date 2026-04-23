@@ -5,12 +5,14 @@ import {
   UnauthorizedException,
   Logger,
 } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/roles.decorator';
 import { PrismaService } from '../../database/prisma.service';
+import { RedisService } from '../../redis/redis.service';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -20,6 +22,7 @@ export class AuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
     private readonly reflector: Reflector,
   ) {}
 
@@ -43,17 +46,26 @@ export class AuthGuard implements CanActivate {
         secret: this.configService.get<string>('jwt.secret'),
       });
 
+      const blacklisted = await this.redisService.exists(`blacklist:access:${this.hashToken(token)}`);
+      if (blacklisted) {
+        throw new UnauthorizedException('Access token has been revoked');
+      }
+
       // Load fresh user from DB to ensure they still exist and are active
-      const user = await this.prisma.user.findUnique({
+      const user = await (this.prisma as any).user.findUnique({
         where: { id: payload.sub },
         select: {
           id: true,
+          fullName: true,
           email: true,
+          phone: true,
           username: true,
-          displayName: true,
           avatar: true,
           role: true,
           status: true,
+          tenantId: true,
+          isEmailVerified: true,
+          isPhoneVerified: true,
         },
       });
 
@@ -65,7 +77,11 @@ export class AuthGuard implements CanActivate {
         throw new UnauthorizedException('Your account has been banned');
       }
 
-      request['user'] = user;
+      request['user'] = {
+        ...user,
+        roles: payload.roles ?? [],
+        permissions: payload.permissions ?? [],
+      };
       return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
@@ -82,5 +98,9 @@ export class AuthGuard implements CanActivate {
     }
     // Also support cookie-based auth
     return request.cookies?.['access_token'];
+  }
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 }

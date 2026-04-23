@@ -19,16 +19,20 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({
+    const user = await (this.prisma as any).user.findUnique({
       where: { id: payload.sub },
       select: {
         id: true,
+        fullName: true,
         email: true,
+        phone: true,
         username: true,
-        displayName: true,
         avatar: true,
         role: true,
         status: true,
+        tenantId: true,
+        isEmailVerified: true,
+        isPhoneVerified: true,
       },
     });
 
@@ -39,6 +43,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Your account has been banned');
     }
 
-    return user;
+    return {
+      ...user,
+      roles: payload.roles ?? [],
+      permissions: payload.permissions ?? [],
+    };
   }
 }

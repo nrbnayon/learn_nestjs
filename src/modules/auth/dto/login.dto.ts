@@ -4,28 +4,50 @@
 /* eslint-disable prettier/prettier */
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsEmail,
+  IsIn,
   IsNotEmpty,
+  IsOptional,
   IsString,
-  MinLength,
-  MaxLength,
+  Matches,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class LoginDto {
-  @ApiProperty({ example: 'user@example.com', description: 'User email address' })
-  @IsEmail({}, { message: 'Please provide a valid email address' })
-  @IsNotEmpty()
-  @Transform(({ value }) => value?.toLowerCase().trim())
-  email: string;
-
   @ApiProperty({
-    example: 'MySecurePass123!',
-    description: 'User password (min 8 chars)',
+    example: 'john_doe',
+    description: 'email | username | phone',
   })
   @IsString()
   @IsNotEmpty()
-  @MinLength(8, { message: 'Password must be at least 8 characters' })
-  @MaxLength(100)
-  password: string;
+  @Transform(({ value }) => value?.trim())
+  identifier: string;
+
+  @ApiProperty({
+    example: 'MySecurePass123!',
+    required: false,
+    description: 'Required for identifier+password flow',
+  })
+  @IsOptional()
+  @IsString()
+  password?: string;
+
+  @ApiProperty({
+    example: '123456',
+    required: false,
+    description: 'Required for OTP flow',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{6}$/, { message: 'OTP must be a 6 digit code' })
+  otp?: string;
+
+  @ApiProperty({
+    example: 'google',
+    required: false,
+    enum: ['google', 'github', 'facebook', 'linkedin'],
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['google', 'github', 'facebook', 'linkedin'])
+  provider?: 'google' | 'github' | 'facebook' | 'linkedin';
 }

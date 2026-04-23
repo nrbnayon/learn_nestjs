@@ -5,9 +5,9 @@ import { v4 as uuidv4 } from 'uuid';
 
 export interface JwtPayload {
   sub: string;
-  email: string;
-  username: string;
-  role: string;
+  tenantId?: string;
+  roles: string[];
+  permissions: string[];
   iat?: number;
   exp?: number;
 }
@@ -29,14 +29,14 @@ export class JwtHelperService {
   generateAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.secret'),
-      expiresIn: this.configService.get<string>('jwt.expiresIn', '7d') as any,
+      expiresIn: this.configService.get<string>('jwt.expiresIn', '15m') as any,
     });
   }
 
   generateRefreshToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.refreshSecret'),
-      expiresIn: this.configService.get<string>('jwt.refreshExpiresIn', '30d') as any,
+      expiresIn: this.configService.get<string>('jwt.refreshExpiresIn', '7d') as any,
     });
   }
 

@@ -1,10 +1,20 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FastifyRequest } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/roles.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { AuthService } from './auth.service';
-import { ChangePasswordDto, ForgotPasswordDto, RefreshTokenDto, RegisterDto, ResetPasswordDto, VerifyEmailDto } from './dto/register.dto';
+import {
+	ChangePasswordDto,
+	ForgotPasswordDto,
+	OtpSendDto,
+	OtpVerifyDto,
+	RefreshTokenDto,
+	RegisterDto,
+	ResetPasswordDto,
+	VerifyEmailDto,
+} from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
 @ApiTags('auth')
@@ -15,21 +25,73 @@ export class AuthController {
 	@Public()
 	@Post('register')
 	@ApiOperation({ summary: 'Register a new user' })
-	register(@Body() dto: RegisterDto) {
-		return this.authService.register(dto);
+	register(
+		@Body() dto: RegisterDto,
+		@Headers('x-tenant-id') tenantId?: string,
+		@Headers('x-tenant-domain') tenantDomain?: string,
+		@Req() req?: FastifyRequest,
+	) {
+		return this.authService.register(dto, {
+			tenantId,
+			tenantDomain,
+			ipAddress: req?.ip,
+			userAgent: typeof req?.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
+		});
 	}
 
 	@Public()
 	@Post('login')
-	@ApiOperation({ summary: 'Login with email and password' })
-	login(@Body() dto: LoginDto) {
-		return this.authService.login(dto);
+	@ApiOperation({ summary: 'Unified login (password, OTP, OAuth account)' })
+	login(
+		@Body() dto: LoginDto,
+		@Headers('x-tenant-id') tenantId?: string,
+		@Headers('x-tenant-domain') tenantDomain?: string,
+		@Req() req?: FastifyRequest,
+	) {
+		return this.authService.login(dto, {
+			tenantId,
+			tenantDomain,
+			ipAddress: req?.ip,
+			userAgent: typeof req?.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
+		});
+	}
+
+	@Public()
+	@Post('otp/send')
+	sendOtp(@Body() dto: OtpSendDto, @Headers('x-tenant-domain') tenantDomain?: string) {
+		return this.authService.sendOtp(dto, {
+			tenantDomain,
+			tenantId: dto.tenantId,
+		});
+	}
+
+	@Public()
+	@Post('otp/verify')
+	verifyOtp(
+		@Body() dto: OtpVerifyDto,
+		@Headers('x-tenant-domain') tenantDomain?: string,
+		@Req() req?: FastifyRequest,
+	) {
+		return this.authService.verifyOtp(dto, {
+			tenantDomain,
+			tenantId: dto.tenantId,
+			ipAddress: req?.ip,
+			userAgent: typeof req?.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
+		});
 	}
 
 	@Public()
 	@Post('refresh-token')
-	refreshToken(@Body() dto: RefreshTokenDto) {
-		return this.authService.refreshTokens(dto);
+	refreshToken(
+		@Body() dto: RefreshTokenDto,
+		@Headers('x-tenant-id') tenantId?: string,
+		@Req() req?: FastifyRequest,
+	) {
+		return this.authService.refreshTokens(dto, {
+			tenantId,
+			ipAddress: req?.ip,
+			userAgent: typeof req?.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
+		});
 	}
 
 	@Public()
@@ -60,8 +122,14 @@ export class AuthController {
 	@UseGuards(AuthGuard)
 	@ApiBearerAuth()
 	@Post('logout')
-	logout(@CurrentUser('id') userId: string) {
-		return this.authService.logout(userId);
+	logout(@CurrentUser('id') userId: string, @Req() req?: FastifyRequest) {
+		const authHeader = req?.headers?.authorization;
+		const accessToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+		return this.authService.logout(userId, {
+			accessToken,
+			ipAddress: req?.ip,
+			userAgent: typeof req?.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
+		});
 	}
 
 	@UseGuards(AuthGuard)

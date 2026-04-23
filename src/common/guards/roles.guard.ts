@@ -26,7 +26,15 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('No user found in request');
     }
 
-    const hasRole = requiredRoles.some((role) => user.role === role);
+    const assignedRoles = new Set<string>();
+    if (user.role) {
+      assignedRoles.add(String(user.role).toLowerCase());
+    }
+    for (const role of user.roles ?? []) {
+      assignedRoles.add(String(role).toLowerCase());
+    }
+
+    const hasRole = requiredRoles.some((role) => assignedRoles.has(String(role).toLowerCase()));
     if (!hasRole) {
       throw new ForbiddenException(
         `Access denied. Required roles: ${requiredRoles.join(', ')}`,

@@ -7,8 +7,6 @@ import {
   WebSocketGateway,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { WsAuthGuard } from '../../common/guards/ws-auth.guard';
 import { SOCKET_EVENTS } from '../../common/constants/events.constant';
 import { SocketStateService } from '../../socket/socket-state.service';
 import { ChatService } from './chat.service';
@@ -21,15 +19,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly chatService: ChatService,
   ) {}
 
-  handleConnection(client: Socket): void {
+  async handleConnection(client: Socket): Promise<void> {
     const userId = client.data?.userId as string | undefined;
     if (userId) {
-      this.socketState.addSocket(userId, client);
+      await this.socketState.addSocket(userId, client);
+      client.broadcast.emit('user_online', { userId });
     }
   }
 
-  handleDisconnect(client: Socket): void {
-    this.socketState.removeSocket(client.id);
+  async handleDisconnect(client: Socket): Promise<void> {
+    const userId = await this.socketState.removeSocket(client.id);
+    if (userId) {
+      client.broadcast.emit('user_offline', { userId });
+    }
   }
 
   @SubscribeMessage(SOCKET_EVENTS.SEND_MESSAGE)

@@ -14,10 +14,11 @@ datasource db {
 // Enums
 // ============================
 
-enum UserRole {
-  USER
+enum Role {
+  SUPER_ADMIN
   ADMIN
-  MODERATOR
+  MANAGER
+  USER
 }
 
 enum UserStatus {
@@ -66,35 +67,184 @@ enum NotificationType {
 // ============================
 
 model User {
-  id                String     @id @default(cuid())
-  email             String     @unique
-  username          String     @unique
-  displayName       String
-  passwordHash      String
-  avatar            String?
-  bio               String?
-  role              UserRole   @default(USER)
-  status            UserStatus @default(PENDING_VERIFICATION)
-  isOnline          Boolean    @default(false)
-  lastSeenAt        DateTime?
-  emailVerified     Boolean    @default(false)
-  emailVerifyToken  String?
+  id                    String     @id @default(uuid())
+  fullName              String
+  username              String     @unique
+  email                 String?    @unique
+  phone                 String?    @unique
+  password              String?
+  avatar                String?
+  bio                   String?
+  role                  Role       @default(USER)
+  status                UserStatus @default(ACTIVE)
+  tenantId              String?
+  tenant                Tenant?    @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  isEmailVerified       Boolean    @default(false)
+  isPhoneVerified       Boolean    @default(false)
+  isOnline              Boolean    @default(false)
+  lastSeenAt            DateTime?
+  emailVerifyToken      String?
   passwordResetToken    String?
   passwordResetExpires  DateTime?
-  refreshToken      String?
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  refreshToken          String?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
 
   // Relations
-  sentMessages      Message[]         @relation("SentMessages")
-  roomMembers       RoomMember[]
-  sentFriendRequests   Friendship[]   @relation("Requester")
-  receivedFriendRequests Friendship[] @relation("Addressee")
-  notifications     Notification[]
-  messageReactions  MessageReaction[]
-  readReceipts      ReadReceipt[]
+  roles                 UserRole[]
+  permissions           UserPermission[]
+  oauthAccounts         OAuthAccount[]
+  sessions              AuthSession[]
+  auditLogs             AuditLog[]
+  sentMessages          Message[]         @relation("SentMessages")
+  roomMembers           RoomMember[]
+  sentFriendRequests    Friendship[]      @relation("Requester")
+  receivedFriendRequests Friendship[]     @relation("Addressee")
+  notifications         Notification[]
+  messageReactions      MessageReaction[]
+  readReceipts          ReadReceipt[]
 
+  @@index([tenantId])
   @@map("users")
+}
+
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String
+  domain      String?  @unique
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tenants")
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  action      String
+  subject     String
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
+  users       UserPermission[]
+
+  @@unique([action, subject])
+  @@map("permissions")
+}
+
+model AppRole {
+  id          String           @id @default(uuid())
+  name        Role
+  tenantId    String?
+  tenant      Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users       UserRole[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([name, tenantId])
+  @@index([tenantId])
+  @@map("roles")
+}
+
+model UserRole {
+  id          String   @id @default(uuid())
+  userId      String
+  roleId      String
+  assignedBy  String?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        AppRole  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id            String      @id @default(uuid())
+  roleId        String
+  permissionId  String
+  createdAt     DateTime    @default(now())
+
+  role          AppRole     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission    Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model UserPermission {
+  id            String      @id @default(uuid())
+  userId        String
+  permissionId  String
+  createdAt     DateTime    @default(now())
+
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission    Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId])
+  @@index([permissionId])
+  @@map("user_permissions")
+}
+
+model OAuthAccount {
+  id                String    @id @default(uuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model AuthSession {
+  id                String    @id @default(uuid())
+  userId            String
+  tenantId          String?
+  refreshTokenHash  String
+  userAgent         String?
+  ipAddress         String?
+  isRevoked         Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@map("auth_sessions")
+}
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  userId      String?
+  tenantId    String?
+  action      String
+  resource    String
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([action])
+  @@map("audit_logs")
 }
 
 model Room {

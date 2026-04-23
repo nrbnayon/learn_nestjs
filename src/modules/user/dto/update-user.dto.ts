@@ -1,5 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength, MinLength, Matches } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+  Matches,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class UpdateUserDto {
@@ -17,7 +24,9 @@ export class UpdateUserDto {
   @MinLength(3)
   @MaxLength(30)
   @Matches(/^[a-zA-Z0-9_]+$/)
-  @Transform(({ value }) => (typeof value === 'string' ? value.toLowerCase().trim() : value))
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toLowerCase().trim() : value,
+  )
   username?: string;
 
   @ApiPropertyOptional({ example: 'https://cdn.example.com/avatar.png' })

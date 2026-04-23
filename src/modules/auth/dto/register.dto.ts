@@ -5,7 +5,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsEmail,
+  IsIn,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MinLength,
   MaxLength,
@@ -14,46 +16,58 @@ import {
 import { Transform } from 'class-transformer';
 
 export class RegisterDto {
-  @ApiProperty({ example: 'user@example.com' })
-  @IsEmail({}, { message: 'Please provide a valid email address' })
+  @ApiProperty({ example: 'John Doe' })
+  @IsString()
   @IsNotEmpty()
+  @MinLength(2)
+  @MaxLength(80)
+  @Transform(({ value }) => value?.trim())
+  fullName: string;
+
+  @ApiProperty({ example: 'user@example.com', required: false })
+  @IsOptional()
+  @IsEmail({}, { message: 'Please provide a valid email address' })
   @Transform(({ value }) => value?.toLowerCase().trim())
-  email: string;
+  email?: string;
+
+  @ApiProperty({ example: '+15551234567', required: false })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => value?.trim())
+  phone?: string;
 
   @ApiProperty({
     example: 'john_doe',
     description: 'Unique username (alphanum, 3-30 chars)',
   })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MinLength(3, { message: 'Username must be at least 3 characters' })
   @MaxLength(30, { message: 'Username must not exceed 30 characters' })
   @Matches(/^[a-zA-Z0-9_]+$/, {
     message: 'Username can only contain letters, numbers and underscores',
   })
   @Transform(({ value }) => value?.toLowerCase().trim())
-  username: string;
+  username?: string;
 
-  @ApiProperty({ example: 'John Doe', description: 'Display name (2-50 chars)' })
+  @ApiProperty({ example: 'tenant-01', required: false })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @MinLength(2, { message: 'Display name must be at least 2 characters' })
-  @MaxLength(50, { message: 'Display name must not exceed 50 characters' })
-  @Transform(({ value }) => value?.trim())
-  displayName: string;
+  tenantId?: string;
 
   @ApiProperty({
     example: 'MySecurePass123!',
+    required: false,
     description: 'Password (min 8 chars, must contain uppercase, lowercase, number)',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MinLength(8, { message: 'Password must be at least 8 characters' })
   @MaxLength(100)
   @Matches(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
     message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
   })
-  password: string;
+  password?: string;
 }
 
 export class ForgotPasswordDto {
@@ -62,6 +76,41 @@ export class ForgotPasswordDto {
   @IsNotEmpty()
   @Transform(({ value }) => value?.toLowerCase().trim())
   email: string;
+}
+
+export class OtpSendDto {
+  @ApiProperty({ example: 'user@example.com', description: 'Email or phone' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => value?.trim())
+  identifier: string;
+
+  @ApiProperty({ example: 'email', enum: ['email', 'phone'] })
+  @IsString()
+  @IsIn(['email', 'phone'])
+  channel: 'email' | 'phone';
+
+  @ApiProperty({ example: 'tenant-01', required: false })
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+}
+
+export class OtpVerifyDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsString()
+  @IsNotEmpty()
+  identifier: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @Matches(/^\d{6}$/)
+  otp: string;
+
+  @ApiProperty({ example: 'tenant-01', required: false })
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
 }
 
 export class ResetPasswordDto {

@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Server, ServerOptions } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
-import { SocketStateService } from './socket-state.service';
+import { RedisService } from '../redis/redis.service';
+import * as crypto from 'crypto';
 
 export class SocketIoAdapter extends IoAdapter {
   private readonly logger = new Logger(SocketIoAdapter.name);
@@ -48,17 +49,25 @@ export class SocketIoAdapter extends IoAdapter {
         }
 
         const jwtService = this.app.get(JwtService);
+        const redisService = this.app.get(RedisService);
         const payload = jwtService.verify(token, {
           secret: this.configService.get<string>('jwt.secret'),
         });
+
+        const hash = crypto.createHash('sha256').update(token).digest('hex');
+        const isBlacklisted = await redisService.exists(`blacklist:access:${hash}`);
+        if (isBlacklisted) {
+          return next(new Error('Token has been revoked'));
+        }
 
         if (!payload?.sub) {
           return next(new Error('Invalid token payload'));
         }
 
         socket.data.userId = payload.sub;
-        socket.data.email = payload.email;
-        socket.data.role = payload.role;
+        socket.data.tenantId = payload.tenantId;
+        socket.data.roles = payload.roles ?? [];
+        socket.data.permissions = payload.permissions ?? [];
 
         this.logger.debug(`Socket authenticated: userId=${payload.sub}`);
         next();

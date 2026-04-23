@@ -1,9 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Socket } from 'socket.io';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class SocketStateService {
   private readonly logger = new Logger(SocketStateService.name);
+
+  constructor(private readonly redisService: RedisService) {}
 
   /**
    * Map: userId → Set of socket IDs
@@ -17,16 +20,23 @@ export class SocketStateService {
 
   // ── Connection Management ─────────────────────────────────────────────────
 
-  addSocket(userId: string, socket: Socket): void {
+  async addSocket(userId: string, socket: Socket): Promise<void> {
     if (!this.userSockets.has(userId)) {
       this.userSockets.set(userId, new Set());
     }
     this.userSockets.get(userId)!.add(socket.id);
     this.socketUser.set(socket.id, userId);
+    await this.redisService.set(`user:${userId}:online`, 'true', 120);
+    await this.redisService.publishJson('presence.events', {
+      event: 'user_online',
+      userId,
+      socketId: socket.id,
+      at: new Date().toISOString(),
+    });
     this.logger.debug(`Socket ${socket.id} added for user ${userId}`);
   }
 
-  removeSocket(socketId: string): string | undefined {
+  async removeSocket(socketId: string): Promise<string | undefined> {
     const userId = this.socketUser.get(socketId);
     if (!userId) return undefined;
 
@@ -37,6 +47,13 @@ export class SocketStateService {
       sockets.delete(socketId);
       if (sockets.size === 0) {
         this.userSockets.delete(userId);
+        await this.redisService.del(`user:${userId}:online`);
+        await this.redisService.publishJson('presence.events', {
+          event: 'user_offline',
+          userId,
+          socketId,
+          at: new Date().toISOString(),
+        });
         this.logger.debug(`User ${userId} is now offline (last socket removed)`);
       }
     }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CommonModule } from './common/common.module';
@@ -23,6 +24,12 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { HealthModule } from './modules/health/health.module';
 import { CronModule } from './jobs/cron.module';
+import { TenantModule } from './modules/tenant/tenant.module';
+import { RoleModule } from './modules/role/role.module';
+import { PermissionModule } from './modules/permission/permission.module';
+import { SessionModule } from './modules/session/session.module';
+import { OauthModule } from './modules/oauth/oauth.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
@@ -41,6 +48,14 @@ import { CronModule } from './jobs/cron.module';
         },
       }),
     }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => [{
+        ttl: configService.get<number>('throttle.ttl', 60) * 1000,
+        limit: configService.get<number>('throttle.limit', 100),
+      }],
+    }),
     CommonModule,
     PrismaModule,
     RedisModule,
@@ -56,6 +71,12 @@ import { CronModule } from './jobs/cron.module';
     UploadModule,
     HealthModule,
     CronModule,
+    TenantModule,
+    RoleModule,
+    PermissionModule,
+    SessionModule,
+    OauthModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],
