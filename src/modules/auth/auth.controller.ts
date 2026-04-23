@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FastifyRequest } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -92,6 +92,12 @@ export class AuthController {
 			ipAddress: req?.ip,
 			userAgent: typeof req?.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
 		});
+	}
+
+	@Public()
+	@Get('verify-email')
+	verifyEmailFromLink(@Query('token') token: string) {
+		return this.authService.verifyEmail({ token });
 	}
 
 	@Public()

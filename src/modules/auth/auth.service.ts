@@ -289,11 +289,11 @@ export class AuthService {
       },
     });
 
-    const baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:3001');
+    const resetUrl = this.buildApiUrl(`/auth/reset-password?token=${resetToken}`);
     await this.mailService.sendMail({
       to: user.email,
       subject: 'Reset Password',
-      html: `<p>Hello ${user.fullName}, reset link: ${baseUrl}/auth/reset-password?token=${resetToken}</p>`,
+      html: `<p>Hello ${user.fullName}, reset link: ${resetUrl}</p>`,
     });
   }
 
@@ -658,12 +658,19 @@ export class AuthService {
   }
 
   private async sendEmailVerification(email: string, fullName: string, token: string) {
-    const baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:3001');
+    const verificationUrl = this.buildApiUrl(`/auth/verify-email?token=${token}`);
     await this.mailService.sendMail({
       to: email,
       subject: 'Verify your email',
-      html: `<p>Hello ${fullName}, verify here: ${baseUrl}/auth/verify-email?token=${token}</p>`,
+      html: `<p>Hello ${fullName}, verify here: ${verificationUrl}</p>`,
     });
+  }
+
+  private buildApiUrl(path: string): string {
+    const baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:3001');
+    const apiPrefix = this.configService.get<string>('app.apiPrefix', 'api/v1');
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${baseUrl}/${apiPrefix}${normalizedPath}`;
   }
 
   private async revokeUserSessions(userId: string) {

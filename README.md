@@ -1,6 +1,6 @@
 # 🚀 NestJS Chat Backend
 
-A modern, scalable real-time chat application backend built with **NestJS**, **TypeScript**, **PostgreSQL**, **Redis**, and **Socket.IO**.
+A modern, scalable real-time backend built with **NestJS**, **TypeScript**, **PostgreSQL**, **Redis**, and **Socket.IO**.
 
 ## 📋 Table of Contents
 
@@ -8,6 +8,7 @@ A modern, scalable real-time chat application backend built with **NestJS**, **T
 - [Prerequisites](#prerequisites)
 - [Project Setup](#project-setup)
 - [Running the Application](#running-the-application)
+- [Auth Platform API Testing](#auth-platform-api-testing)
 - [Docker Commands](#docker-commands)
 
 ---
@@ -180,10 +181,42 @@ Base URL: `http://localhost:8080/api/v1/` for Docker
 Base URL: `http://localhost:3001/api/v1/` for local dev
 
 ```
-Auth:
+Auth platform:
   POST   /auth/register
   POST   /auth/login
+  POST   /auth/refresh-token
   POST   /auth/logout
+  GET    /auth/me
+  POST   /auth/change-password
+  POST   /auth/otp/send
+  POST   /auth/otp/verify
+  POST   /auth/verify-email
+  POST   /auth/forgot-password
+  POST   /auth/reset-password
+
+Tenants:
+  POST   /tenants
+  GET    /tenants
+
+Roles:
+  POST   /roles
+  GET    /roles
+  POST   /roles/:roleId/permissions/:permissionId
+  POST   /roles/:roleId/users/:userId
+
+Permissions:
+  POST   /permissions
+  GET    /permissions
+
+Sessions:
+  GET    /sessions/users/:userId
+  DELETE /sessions/users/:userId
+
+OAuth:
+  POST   /oauth/connect
+
+Audit:
+  GET    /audit?limit=50
 
 Users:
   GET    /users
@@ -204,6 +237,29 @@ Messages:
 Health:
   GET    /health
 ```
+
+## 🔐 Auth Platform API Testing
+
+Use the importable Postman collection at [postman/NestJS-Auth-Platform.postman_collection.json](postman/NestJS-Auth-Platform.postman_collection.json).
+
+The full request-by-request testing guide is in [docs/auth-platform-api.md](docs/auth-platform-api.md).
+
+Recommended Postman variables:
+- `baseUrl` = `http://localhost:3001/api/v1`
+- `tenantId`
+- `tenantDomain`
+- `accessToken`
+- `refreshToken`
+- `userId`
+- `roleId`
+- `permissionId`
+- `providerAccountId`
+
+For protected routes, send `Authorization: Bearer <accessToken>`.
+
+For multi-tenant requests, send either `x-tenant-id` or `x-tenant-domain`.
+
+For social login testing, you do not need an extra backend API key. You do need the provider’s OAuth app credentials for a real Google/GitHub/Facebook/LinkedIn flow.
 
 ---
 
