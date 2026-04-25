@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { NotificationType, Prisma } from '@prisma/client';
 import { QUEUE_NAMES } from '../queue.constants';
 import { PrismaService } from '../../database/prisma.service';
 import { SendNotificationJobData } from '../queue.service';
@@ -22,10 +23,10 @@ export class NotificationProcessor extends WorkerHost {
       await this.prisma.notification.create({
         data: {
           userId: job.data.userId,
-          type: job.data.type,
+          type: job.data.type as NotificationType,
           title: job.data.title,
           body: job.data.body,
-          data: job.data.data ?? {},
+          data: (job.data.data ?? {}) as Prisma.InputJsonValue,
         },
       });
 

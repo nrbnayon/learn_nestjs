@@ -40,16 +40,14 @@ export class MailService {
       const recipients = Array.isArray(options.to)
         ? options.to.join(', ')
         : options.to;
-      const info = await this.transporter.sendMail({
+      const info = (await this.transporter.sendMail({
         from,
         to: recipients,
         subject: options.subject,
         html,
         text: options.text,
-      });
-      this.logger.log(
-        `Email sent: ${(info as { messageId?: string }).messageId ?? 'unknown'}`,
-      );
+      })) as unknown as { messageId?: string };
+      this.logger.log(`Email sent: ${info.messageId ?? 'unknown'}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       const recipients = Array.isArray(options.to)

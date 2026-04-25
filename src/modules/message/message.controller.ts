@@ -9,7 +9,7 @@ export class MessageController {
 
   @Get(':roomId')
   listMessages(@Param('roomId') roomId: string) {
-    return this.messageService.listMessages(roomId);
+    return this.messageService.listMessages();
   }
 
   @Post('send')

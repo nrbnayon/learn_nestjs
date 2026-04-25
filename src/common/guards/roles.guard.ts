@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Role, ROLES_KEY } from '../constants/roles.constant';
-import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
+import { Request } from 'express';
+import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -21,7 +22,8 @@ export class RolesGuard implements CanActivate {
     // No role restriction
     if (!requiredRoles || requiredRoles.length === 0) return true;
 
-    const { user } = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const request = context.switchToHttp().getRequest<Request>();
+    const { user } = request as Request & { user?: AuthenticatedUser };
 
     if (!user) {
       throw new ForbiddenException('No user found in request');

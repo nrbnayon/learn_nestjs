@@ -10,7 +10,7 @@ import {
   PERMISSION_KEY,
   RESOURCE_OWNER_PARAM_KEY,
 } from '../decorators/permissions.decorator';
-import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
+import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -26,8 +26,14 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const user = request.user;
+    const request = context.switchToHttp().getRequest<Request>();
+    const typedRequest = request as Request & {
+      user?: AuthenticatedUser;
+      params?: Record<string, unknown>;
+      body?: unknown;
+      query?: unknown;
+    };
+    const user = typedRequest.user;
 
     if (!user) {
       throw new ForbiddenException('User context missing');
@@ -49,15 +55,9 @@ export class PermissionsGuard implements CanActivate {
 
     if (ownerParam) {
       const ownerId =
-        this.getStringValue(request.params, ownerParam) ??
-        this.getStringValue(
-          request.body as Record<string, unknown> | undefined,
-          ownerParam,
-        ) ??
-        this.getStringValue(
-          request.query as Record<string, unknown> | undefined,
-          ownerParam,
-        );
+        this.getStringValue(typedRequest.params, ownerParam) ??
+        this.getStringValue(typedRequest.body, ownerParam) ??
+        this.getStringValue(typedRequest.query, ownerParam);
 
       const roles = new Set(
         (user.roles ?? []).map((role) => role.toLowerCase()),
@@ -75,11 +75,12 @@ export class PermissionsGuard implements CanActivate {
     throw new ForbiddenException('Missing required permissions');
   }
 
-  private getStringValue(
-    source: Record<string, unknown> | undefined,
-    key: string,
-  ): string | undefined {
-    const value = source?.[key];
+  private getStringValue(source: unknown, key: string): string | undefined {
+    if (!source || typeof source !== 'object') {
+      return undefined;
+    }
+
+    const value = (source as Record<string, unknown>)[key];
     return typeof value === 'string' ? value : undefined;
   }
 }

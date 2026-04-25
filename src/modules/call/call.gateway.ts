@@ -9,6 +9,8 @@ import { SOCKET_EVENTS } from '../../common/constants/events.constant';
 import { CallService } from './call.service';
 import { CreateCallDto } from './dto/create-call.dto';
 
+type CallSocket = Socket;
+
 @WebSocketGateway({
   namespace: '/call',
   cors: { origin: true, credentials: true },
@@ -18,17 +20,19 @@ export class CallGateway {
 
   @SubscribeMessage(SOCKET_EVENTS.AUTHENTICATE)
   handleCreateCall(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: CallSocket,
     @MessageBody() dto: CreateCallDto,
   ) {
-    return this.callService.createSession(client.data.userId, dto);
+    const socketData = client as unknown as { data?: { userId?: string } };
+    return this.callService.createSession(socketData.data?.userId ?? '', dto);
   }
 
   @SubscribeMessage('call:signal')
   handleSignal(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: Record<string, any>,
+    @ConnectedSocket() client: CallSocket,
+    @MessageBody() payload: Record<string, unknown>,
   ) {
-    return this.callService.relaySignal(client.data.userId, payload);
+    const socketData = client as unknown as { data?: { userId?: string } };
+    return this.callService.relaySignal(socketData.data?.userId ?? '', payload);
   }
 }

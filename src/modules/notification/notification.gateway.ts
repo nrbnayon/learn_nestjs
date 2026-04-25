@@ -8,10 +8,6 @@ import { Socket } from 'socket.io';
 import { SOCKET_EVENTS } from '../../common/constants/events.constant';
 import { NotificationService } from './notification.service';
 
-interface NotificationSocketPayload {
-  userId?: string;
-}
-
 @WebSocketGateway({
   namespace: '/notifications',
   cors: { origin: true, credentials: true },
@@ -24,9 +20,13 @@ export class NotificationGateway {
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: Record<string, unknown>,
   ) {
-    const socketData = client.data as NotificationSocketPayload;
+    const socketData = client as unknown as { data?: { userId?: string } };
+    if (!socketData.data?.userId) {
+      return;
+    }
+
     return this.notificationService.dispatchNotification(
-      socketData.userId ?? '',
+      socketData.data.userId,
       payload,
     );
   }

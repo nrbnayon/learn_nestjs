@@ -903,7 +903,7 @@ export class AuthService {
         },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Default role assignment failed: ${message}`);
     }
   }
@@ -945,14 +945,12 @@ export class AuthService {
       return user;
     }
 
-    const {
-      password,
-      refreshToken,
-      emailVerifyToken,
-      passwordResetToken,
-      passwordResetExpires,
-      ...safe
-    } = user;
+    const safe: Record<string, unknown> = { ...user };
+    delete safe.password;
+    delete safe.refreshToken;
+    delete safe.emailVerifyToken;
+    delete safe.passwordResetToken;
+    delete safe.passwordResetExpires;
 
     return safe;
   }

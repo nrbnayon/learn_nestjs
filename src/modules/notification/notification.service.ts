@@ -5,12 +5,15 @@ import { QueueService } from '../../queue/queue.service';
 export class NotificationService {
   constructor(private readonly queueService: QueueService) {}
 
-  async dispatchNotification(userId: string, payload: Record<string, any>) {
-    await this.queueService.sendNotification({
+  dispatchNotification(userId: string, payload: Record<string, unknown>) {
+    const toText = (value: unknown, fallback: string): string =>
+      typeof value === 'string' ? value : fallback;
+
+    this.queueService.sendNotification({
       userId,
-      type: String(payload.type ?? 'SYSTEM'),
-      title: String(payload.title ?? 'Notification'),
-      body: String(payload.body ?? ''),
+      type: toText(payload.type, 'SYSTEM'),
+      title: toText(payload.title, 'Notification'),
+      body: toText(payload.body, ''),
       data: payload,
     });
 

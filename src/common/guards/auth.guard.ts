@@ -13,6 +13,7 @@ import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/roles.decorator';
 import { PrismaService } from '../../database/prisma.service';
 import { RedisService } from '../../redis/redis.service';
+import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -35,14 +36,22 @@ export class AuthGuard implements CanActivate {
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<Request>();
-    const token = this.extractToken(request);
+    const typedRequest = request as Request & {
+      user?: AuthenticatedUser & { roles?: string[]; permissions?: string[] };
+      cookies?: Record<string, string | undefined>;
+    };
+    const token = this.extractToken(typedRequest);
 
     if (!token) {
       throw new UnauthorizedException('Access token is required');
     }
 
     try {
-      const payload = this.jwtService.verify(token, {
+      const payload = this.jwtService.verify<{
+        sub: string;
+        roles?: string[];
+        permissions?: string[];
+      }>(token, {
         secret: this.configService.get<string>('jwt.secret'),
       });
 
@@ -54,7 +63,7 @@ export class AuthGuard implements CanActivate {
       }
 
       // Load fresh user from DB to ensure they still exist and are active
-      const user = await (this.prisma as any).user.findUnique({
+      const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
         select: {
           id: true,
@@ -79,7 +88,7 @@ export class AuthGuard implements CanActivate {
         throw new UnauthorizedException('Your account has been banned');
       }
 
-      request['user'] = {
+      typedRequest.user = {
         ...user,
         roles: payload.roles ?? [],
         permissions: payload.permissions ?? [],
@@ -87,19 +96,26 @@ export class AuthGuard implements CanActivate {
       return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`JWT verification failed: ${message}`);
       throw new UnauthorizedException('Invalid or expired access token');
     }
   }
 
-  private extractToken(request: Request): string | undefined {
+  private extractToken(
+    request: Request & { cookies?: Record<string, string | undefined> },
+  ): string | undefined {
     const authHeader = request.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       return authHeader.slice(7);
     }
+
     // Also support cookie-based auth
-    return request.cookies?.['access_token'];
+    const cookies = (request.cookies ?? {}) as unknown as Record<
+      string,
+      string | undefined
+    >;
+    return cookies.access_token;
   }
 
   private hashToken(token: string): string {

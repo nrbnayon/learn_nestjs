@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { PrismaModule } from '../../database/prisma.module';
 import { RedisModule } from '../../redis/redis.module';
@@ -17,10 +17,10 @@ import { JwtStrategy } from './auth.strategy';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService): JwtModuleOptions => ({
         secret: configService.get<string>('jwt.secret'),
         signOptions: {
-          expiresIn: configService.get<string>('jwt.expiresIn', '15m'),
+          expiresIn: configService.get<string>('jwt.expiresIn', '15m') as JwtModuleOptions['signOptions']['expiresIn'],
         },
       }),
     }),

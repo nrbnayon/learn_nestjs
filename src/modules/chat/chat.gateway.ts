@@ -23,7 +23,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {}
 
   async handleConnection(client: Socket): Promise<void> {
-    const userId = client.data?.userId as string | undefined;
+    const socketData = client as unknown as { data?: { userId?: string } };
+    const userId = socketData.data?.userId;
     if (userId) {
       await this.socketState.addSocket(userId, client);
       client.broadcast.emit('user_online', { userId });
@@ -42,26 +43,32 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() dto: SendChatMessageDto,
   ) {
-    const message = this.chatService.sendMessage(client.data.userId, dto);
+    const socketData = client as unknown as { data?: { userId?: string } };
+    const message = this.chatService.sendMessage(
+      socketData.data?.userId ?? '',
+      dto,
+    );
     client.to(dto.roomId).emit(SOCKET_EVENTS.NEW_MESSAGE, message);
     return message;
   }
 
   @SubscribeMessage(SOCKET_EVENTS.JOIN_ROOM)
-  handleJoinRoom(
+  async handleJoinRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody() roomId: string,
   ) {
-    client.join(roomId);
-    return this.chatService.joinRoom(client.data.userId, roomId);
+    const socketData = client as unknown as { data?: { userId?: string } };
+    await client.join(roomId);
+    return this.chatService.joinRoom(socketData.data?.userId ?? '', roomId);
   }
 
   @SubscribeMessage(SOCKET_EVENTS.LEAVE_ROOM)
-  handleLeaveRoom(
+  async handleLeaveRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody() roomId: string,
   ) {
-    client.leave(roomId);
-    return this.chatService.leaveRoom(client.data.userId, roomId);
+    const socketData = client as unknown as { data?: { userId?: string } };
+    await client.leave(roomId);
+    return this.chatService.leaveRoom(socketData.data?.userId ?? '', roomId);
   }
 }

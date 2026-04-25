@@ -1,5 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import type { Server } from 'http';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
@@ -20,6 +21,7 @@ describe('Auth (e2e)', () => {
   });
 
   it('/health (GET)', async () => {
-    await request(app.getHttpServer()).get('/api/v1/health').expect(200);
+    const httpServer = app.getHttpServer() as Server;
+    await request(httpServer).get('/api/v1/health').expect(200);
   });
 });

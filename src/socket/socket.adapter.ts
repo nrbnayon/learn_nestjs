@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { INestApplicationContext, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IoAdapter } from '@nestjs/platform-socket.io';
@@ -5,6 +6,19 @@ import { Server, ServerOptions } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { RedisService } from '../redis/redis.service';
 import * as crypto from 'crypto';
+
+type SocketWithAuthData = {
+  handshake: {
+    auth?: { token?: string | undefined };
+    headers?: { authorization?: string | undefined };
+  };
+  data: {
+    userId?: string;
+    tenantId?: string;
+    roles?: string[];
+    permissions?: string[];
+  };
+};
 
 export class SocketIoAdapter extends IoAdapter {
   private readonly logger = new Logger(SocketIoAdapter.name);
@@ -38,48 +52,60 @@ export class SocketIoAdapter extends IoAdapter {
     const server: Server = super.createIOServer(port, serverOptions);
 
     // JWT authentication middleware
-    server.use(async (socket, next) => {
-      try {
-        const token =
-          socket.handshake.auth?.token ||
-          socket.handshake.headers?.authorization?.replace('Bearer ', '');
-
-        if (!token) {
-          return next(new Error('Authentication token missing'));
-        }
-
-        const jwtService = this.app.get(JwtService);
-        const redisService = this.app.get(RedisService);
-        const payload = jwtService.verify(token, {
-          secret: this.configService.get<string>('jwt.secret'),
-        });
-
-        const hash = crypto.createHash('sha256').update(token).digest('hex');
-        const isBlacklisted = await redisService.exists(
-          `blacklist:access:${hash}`,
-        );
-        if (isBlacklisted) {
-          return next(new Error('Token has been revoked'));
-        }
-
-        if (!payload?.sub) {
-          return next(new Error('Invalid token payload'));
-        }
-
-        socket.data.userId = payload.sub;
-        socket.data.tenantId = payload.tenantId;
-        socket.data.roles = payload.roles ?? [];
-        socket.data.permissions = payload.permissions ?? [];
-
-        this.logger.debug(`Socket authenticated: userId=${payload.sub}`);
-        next();
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.warn(`Socket authentication failed: ${message}`);
-        next(new Error('Unauthorized'));
-      }
+    server.use((socket: SocketWithAuthData, next) => {
+      void this.authenticateSocket(socket, next);
     });
 
     return server;
+  }
+
+  private async authenticateSocket(
+    socket: SocketWithAuthData,
+    next: (err?: Error) => void,
+  ) {
+    try {
+      const token =
+        socket.handshake.auth?.token ??
+        socket.handshake.headers?.authorization?.replace('Bearer ', '');
+
+      if (!token) {
+        return next(new Error('Authentication token missing'));
+      }
+
+      const jwtService = this.app.get(JwtService);
+      const redisService = this.app.get(RedisService);
+      const payload = jwtService.verify<{
+        sub: string;
+        tenantId?: string;
+        roles?: string[];
+        permissions?: string[];
+      }>(token, {
+        secret: this.configService.get<string>('jwt.secret'),
+      });
+
+      const hash = crypto.createHash('sha256').update(token).digest('hex');
+      const isBlacklisted = await redisService.exists(
+        `blacklist:access:${hash}`,
+      );
+      if (isBlacklisted) {
+        return next(new Error('Token has been revoked'));
+      }
+
+      if (!payload?.sub) {
+        return next(new Error('Invalid token payload'));
+      }
+
+      socket.data.userId = payload.sub;
+      socket.data.tenantId = payload.tenantId;
+      socket.data.roles = payload.roles ?? [];
+      socket.data.permissions = payload.permissions ?? [];
+
+      this.logger.debug(`Socket authenticated: userId=${payload.sub}`);
+      next();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Socket authentication failed: ${message}`);
+      next(new Error('Unauthorized'));
+    }
   }
 }

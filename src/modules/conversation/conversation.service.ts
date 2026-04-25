@@ -3,15 +3,15 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 
 @Injectable()
 export class ConversationService {
-  listConversations() {
-    return [];
+  listConversations(): unknown[] {
+    return [] as unknown[];
   }
 
-  getConversation(conversationId: string) {
+  getConversation(conversationId: string): Record<string, string> {
     return { id: conversationId };
   }
 
-  createConversation(dto: CreateConversationDto) {
+  createConversation(dto: CreateConversationDto): Record<string, unknown> {
     return {
       id: `conversation_${Date.now()}`,
       ...dto,

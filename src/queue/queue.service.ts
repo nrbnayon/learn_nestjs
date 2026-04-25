@@ -4,7 +4,7 @@ export interface SendEmailJobData {
   to: string;
   subject: string;
   template: string;
-  context: Record<string, any>;
+  context: Record<string, unknown>;
 }
 
 export interface SendNotificationJobData {
@@ -12,7 +12,7 @@ export interface SendNotificationJobData {
   type: string;
   title: string;
   body: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
 @Injectable()
@@ -27,11 +27,8 @@ export class QueueService {
     );
   }
 
-  async sendWelcomeEmail(user: {
-    email: string;
-    displayName: string;
-  }): Promise<void> {
-    await this.sendEmail({
+  sendWelcomeEmail(user: { email: string; displayName: string }): void {
+    this.sendEmail({
       to: user.email,
       subject: 'Welcome to NestJS Chat! 🎉',
       template: 'welcome',
@@ -39,12 +36,12 @@ export class QueueService {
     });
   }
 
-  async sendVerificationEmail(
+  sendVerificationEmail(
     user: { email: string; displayName: string },
     token: string,
     baseUrl: string,
-  ): Promise<void> {
-    await this.sendEmail({
+  ): void {
+    this.sendEmail({
       to: user.email,
       subject: 'Verify your email address',
       template: 'verify-email',
@@ -55,12 +52,12 @@ export class QueueService {
     });
   }
 
-  async sendPasswordResetEmail(
+  sendPasswordResetEmail(
     user: { email: string; displayName: string },
     token: string,
     baseUrl: string,
-  ): Promise<void> {
-    await this.sendEmail({
+  ): void {
+    this.sendEmail({
       to: user.email,
       subject: 'Reset your password',
       template: 'password-reset',
