@@ -8,7 +8,9 @@ export class PermissionController {
   constructor(private readonly permissionService: PermissionService) {}
 
   @Post()
-  create(@Body() dto: { action: string; subject: string; description?: string }) {
+  create(
+    @Body() dto: { action: string; subject: string; description?: string },
+  ) {
     return this.permissionService.create(dto);
   }
 

@@ -1,14 +1,14 @@
 import {
-	BadRequestException,
-	Body,
-	Controller,
-	Get,
-	Headers,
-	Post,
-	Query,
-	Req,
-	Res,
-	UseGuards,
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FastifyReply, FastifyRequest } from 'fastify';
@@ -17,170 +17,232 @@ import { Public } from '../../common/decorators/roles.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { AuthService } from './auth.service';
 import {
-	ChangePasswordDto,
-	ForgotPasswordDto,
-	OtpSendDto,
-	OtpVerifyDto,
-	RefreshTokenDto,
-	RegisterDto,
-	ResetPasswordDto,
-	VerifyEmailDto,
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  OtpSendDto,
+  OtpVerifyDto,
+  RefreshTokenDto,
+  RegisterDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
 } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-	constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
-	@Public()
-	@Post('register')
-	@ApiOperation({ summary: 'Register a new user' })
-	register(
-		@Body() dto: RegisterDto,
-		@Headers('x-tenant-id') tenantId?: string,
-		@Headers('x-tenant-domain') tenantDomain?: string,
-		@Req() req?: FastifyRequest,
-	) {
-		return this.authService.register(dto, {
-			tenantId,
-			tenantDomain,
-			ipAddress: req?.ip,
-			userAgent: typeof req?.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
-		});
-	}
+  @Public()
+  @Post('register')
+  @ApiOperation({ summary: 'Register a new user' })
+  register(
+    @Body() dto: RegisterDto,
+    @Headers('x-tenant-id') tenantId?: string,
+    @Headers('x-tenant-domain') tenantDomain?: string,
+    @Req() req?: FastifyRequest,
+  ) {
+    return this.authService.register(dto, {
+      tenantId,
+      tenantDomain,
+      ipAddress: req?.ip,
+      userAgent:
+        typeof req?.headers['user-agent'] === 'string'
+          ? req.headers['user-agent']
+          : undefined,
+    });
+  }
 
-	@Public()
-	@Post('login')
-	@ApiOperation({ summary: 'Unified login (password, OTP, OAuth account)' })
-	login(
-		@Body() dto: LoginDto,
-		@Headers('x-tenant-id') tenantId?: string,
-		@Headers('x-tenant-domain') tenantDomain?: string,
-		@Req() req?: FastifyRequest,
-	) {
-		return this.authService.login(dto, {
-			tenantId,
-			tenantDomain,
-			ipAddress: req?.ip,
-			userAgent: typeof req?.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
-		});
-	}
+  @Public()
+  @Post('login')
+  @ApiOperation({ summary: 'Unified login (password, OTP, OAuth account)' })
+  login(
+    @Body() dto: LoginDto,
+    @Headers('x-tenant-id') tenantId?: string,
+    @Headers('x-tenant-domain') tenantDomain?: string,
+    @Req() req?: FastifyRequest,
+  ) {
+    return this.authService.login(dto, {
+      tenantId,
+      tenantDomain,
+      ipAddress: req?.ip,
+      userAgent:
+        typeof req?.headers['user-agent'] === 'string'
+          ? req.headers['user-agent']
+          : undefined,
+    });
+  }
 
-	@Public()
-	@Post('otp/send')
-	sendOtp(@Body() dto: OtpSendDto, @Headers('x-tenant-domain') tenantDomain?: string) {
-		return this.authService.sendOtp(dto, {
-			tenantDomain,
-			tenantId: dto.tenantId,
-		});
-	}
+  @Public()
+  @Post('otp/send')
+  sendOtp(
+    @Body() dto: OtpSendDto,
+    @Headers('x-tenant-domain') tenantDomain?: string,
+  ) {
+    return this.authService.sendOtp(dto, {
+      tenantDomain,
+      tenantId: dto.tenantId,
+    });
+  }
 
-	@Public()
-	@Post('otp/verify')
-	verifyOtp(
-		@Body() dto: OtpVerifyDto,
-		@Headers('x-tenant-domain') tenantDomain?: string,
-		@Req() req?: FastifyRequest,
-	) {
-		return this.authService.verifyOtp(dto, {
-			tenantDomain,
-			tenantId: dto.tenantId,
-			ipAddress: req?.ip,
-			userAgent: typeof req?.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
-		});
-	}
+  @Public()
+  @Post('otp/verify')
+  verifyOtp(
+    @Body() dto: OtpVerifyDto,
+    @Headers('x-tenant-domain') tenantDomain?: string,
+    @Req() req?: FastifyRequest,
+  ) {
+    return this.authService.verifyOtp(dto, {
+      tenantDomain,
+      tenantId: dto.tenantId,
+      ipAddress: req?.ip,
+      userAgent:
+        typeof req?.headers['user-agent'] === 'string'
+          ? req.headers['user-agent']
+          : undefined,
+    });
+  }
 
-	@Public()
-	@Post('refresh-token')
-	refreshToken(
-		@Body() dto: RefreshTokenDto,
-		@Headers('x-tenant-id') tenantId?: string,
-		@Req() req?: FastifyRequest,
-	) {
-		return this.authService.refreshTokens(dto, {
-			tenantId,
-			ipAddress: req?.ip,
-			userAgent: typeof req?.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
-		});
-	}
+  @Public()
+  @Post('verify-otp')
+  verifyOtpAlias(
+    @Body() dto: OtpVerifyDto,
+    @Headers('x-tenant-domain') tenantDomain?: string,
+    @Req() req?: FastifyRequest,
+  ) {
+    return this.authService.verifyOtp(dto, {
+      tenantDomain,
+      tenantId: dto.tenantId,
+      ipAddress: req?.ip,
+      userAgent:
+        typeof req?.headers['user-agent'] === 'string'
+          ? req.headers['user-agent']
+          : undefined,
+    });
+  }
 
-	@Public()
-	@Get('verify-email')
-	async verifyEmailFromLink(
-		@Query('token') token: string,
-		@Query('platform') platform?: 'web' | 'app',
-		@Res() reply?: FastifyReply,
-	) {
-		if (!token) {
-			throw new BadRequestException('token is required');
-		}
+  @Public()
+  @Post('refresh-token')
+  refreshToken(
+    @Body() dto: RefreshTokenDto,
+    @Headers('x-tenant-id') tenantId?: string,
+    @Req() req?: FastifyRequest,
+  ) {
+    return this.authService.refreshTokens(dto, {
+      tenantId,
+      ipAddress: req?.ip,
+      userAgent:
+        typeof req?.headers['user-agent'] === 'string'
+          ? req.headers['user-agent']
+          : undefined,
+    });
+  }
 
-		const resolvedPlatform: 'web' | 'app' = platform === 'app' ? 'app' : 'web';
+  @Public()
+  @Get('verify-email')
+  async verifyEmailFromLink(
+    @Query('token') token: string,
+    @Query('platform') platform?: 'web' | 'app',
+    @Res() reply?: FastifyReply,
+  ) {
+    if (!token) {
+      throw new BadRequestException('token is required');
+    }
 
-		try {
-			await this.authService.verifyEmail({ token });
-			const redirectUrl = new URL(
-				this.authService.getVerifyEmailRedirectUrl(resolvedPlatform, 'success'),
-			);
-			redirectUrl.searchParams.set('status', 'success');
-			redirectUrl.searchParams.set('platform', resolvedPlatform);
-			return reply?.redirect(redirectUrl.toString());
-		} catch (error) {
-			const redirectUrl = new URL(
-				this.authService.getVerifyEmailRedirectUrl(resolvedPlatform, 'failure'),
-			);
-			redirectUrl.searchParams.set('status', 'failure');
-			redirectUrl.searchParams.set('platform', resolvedPlatform);
-			if (error instanceof Error) {
-				redirectUrl.searchParams.set('message', error.message);
-			}
-			return reply?.redirect(redirectUrl.toString());
-		}
-	}
+    const resolvedPlatform: 'web' | 'app' = platform === 'app' ? 'app' : 'web';
 
-	@Public()
-	@Post('verify-email')
-	verifyEmail(@Body() dto: VerifyEmailDto) {
-		return this.authService.verifyEmail(dto);
-	}
+    try {
+      await this.authService.verifyEmail({ token });
+      return this.redirectVerificationReply(
+        reply,
+        this.authService.getVerifyEmailRedirectUrl(resolvedPlatform, 'success'),
+        resolvedPlatform,
+        'success',
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Verification failed';
+      return this.redirectVerificationReply(
+        reply,
+        this.authService.getVerifyEmailRedirectUrl(resolvedPlatform, 'failure'),
+        resolvedPlatform,
+        'failure',
+        message,
+      );
+    }
+  }
 
-	@Public()
-	@Post('forgot-password')
-	forgotPassword(@Body() dto: ForgotPasswordDto) {
-		return this.authService.forgotPassword(dto);
-	}
+  private redirectVerificationReply(
+    reply: FastifyReply | undefined,
+    redirectBaseUrl: string,
+    platform: 'web' | 'app',
+    status: 'success' | 'failure',
+    message?: string,
+  ) {
+    if (typeof reply === 'undefined') {
+      throw new BadRequestException('Unable to create redirect response');
+    }
 
-	@Public()
-	@Post('reset-password')
-	resetPassword(@Body() dto: ResetPasswordDto) {
-		return this.authService.resetPassword(dto);
-	}
+    const redirectUrl = new URL(redirectBaseUrl);
+    redirectUrl.searchParams.set('status', status);
+    redirectUrl.searchParams.set('platform', platform);
+    if (message) {
+      redirectUrl.searchParams.set('message', message);
+    }
 
-	@UseGuards(AuthGuard)
-	@ApiBearerAuth()
-	@Get('me')
-	me(@CurrentUser('id') userId: string) {
-		return this.authService.getMe(userId);
-	}
+    return reply.status(302).header('Location', redirectUrl.toString()).send();
+  }
 
-	@UseGuards(AuthGuard)
-	@ApiBearerAuth()
-	@Post('logout')
-	logout(@CurrentUser('id') userId: string, @Req() req?: FastifyRequest) {
-		const authHeader = req?.headers?.authorization;
-		const accessToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
-		return this.authService.logout(userId, {
-			accessToken,
-			ipAddress: req?.ip,
-			userAgent: typeof req?.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
-		});
-	}
+  @Public()
+  @Post('verify-email')
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto);
+  }
 
-	@UseGuards(AuthGuard)
-	@ApiBearerAuth()
-	@Post('change-password')
-	changePassword(@CurrentUser('id') userId: string, @Body() dto: ChangePasswordDto) {
-		return this.authService.changePassword(userId, dto);
-	}
+  @Public()
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Public()
+  @Post('reset-password')
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @Get('me')
+  me(@CurrentUser('id') userId: string) {
+    return this.authService.getMe(userId);
+  }
+
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @Post('logout')
+  logout(@CurrentUser('id') userId: string, @Req() req?: FastifyRequest) {
+    const authHeader = req?.headers?.authorization;
+    const accessToken = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : undefined;
+    return this.authService.logout(userId, {
+      accessToken,
+      ipAddress: req?.ip,
+      userAgent:
+        typeof req?.headers['user-agent'] === 'string'
+          ? req.headers['user-agent']
+          : undefined,
+    });
+  }
+
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @Post('change-password')
+  changePassword(
+    @CurrentUser('id') userId: string,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(userId, dto);
+  }
 }

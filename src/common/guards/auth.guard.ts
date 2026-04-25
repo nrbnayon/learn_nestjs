@@ -46,7 +46,9 @@ export class AuthGuard implements CanActivate {
         secret: this.configService.get<string>('jwt.secret'),
       });
 
-      const blacklisted = await this.redisService.exists(`blacklist:access:${this.hashToken(token)}`);
+      const blacklisted = await this.redisService.exists(
+        `blacklist:access:${this.hashToken(token)}`,
+      );
       if (blacklisted) {
         throw new UnauthorizedException('Access token has been revoked');
       }

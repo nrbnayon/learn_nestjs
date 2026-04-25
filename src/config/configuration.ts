@@ -8,10 +8,10 @@ export default () => ({
     baseUrl: process.env.APP_BASE_URL || 'http://localhost:3001',
     webVerifyEmailSuccessUrl:
       process.env.WEB_VERIFY_EMAIL_SUCCESS_URL ||
-      'http://localhost:5173/auth/verify-email/success',
+      'http://localhost:3000/auth/verify-email/success',
     webVerifyEmailFailureUrl:
       process.env.WEB_VERIFY_EMAIL_FAILURE_URL ||
-      'http://localhost:5173/auth/verify-email/failure',
+      'http://localhost:3000/auth/verify-email/failure',
     appVerifyEmailSuccessUrl:
       process.env.APP_VERIFY_EMAIL_SUCCESS_URL ||
       'nestjschat://auth/verify-email/success',

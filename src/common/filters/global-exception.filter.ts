@@ -11,18 +11,25 @@ import {
   PrismaClientValidationError,
 } from '@prisma/client/runtime/library';
 
+type ErrorResponseShape = {
+  message?: string | string[];
+  error?: string;
+};
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse<{ status: (code: number) => { send: (body: unknown) => void } }>();
+    const response = ctx.getResponse<{
+      status: (code: number) => { send: (body: unknown) => void };
+    }>();
     const request = ctx.getRequest<{ url: string; method: string }>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
-    let errors: any = undefined;
+    let errors: string[] | undefined;
     let code = 'INTERNAL_ERROR';
 
     if (exception instanceof HttpException) {
@@ -31,9 +38,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
-      } else if (typeof exceptionResponse === 'object') {
-        const resp = exceptionResponse as any;
-        message = resp.message ?? message;
+      } else if (
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null
+      ) {
+        const resp = exceptionResponse as ErrorResponseShape;
+        message = typeof resp.message === 'string' ? resp.message : message;
         errors = Array.isArray(resp.message) ? resp.message : undefined;
         if (errors) message = 'Validation failed';
         code = resp.error ?? this.getErrorCode(status);
@@ -66,11 +76,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message = 'Invalid data provided';
       code = 'VALIDATION_ERROR';
     } else if (exception instanceof Error) {
-      message = process.env.NODE_ENV === 'production' ? 'Internal server error' : exception.message;
-      this.logger.error(`Unhandled error: ${exception.message}`, exception.stack);
+      message =
+        process.env.NODE_ENV === 'production'
+          ? 'Internal server error'
+          : exception.message;
+      this.logger.error(
+        `Unhandled error: ${exception.message}`,
+        exception.stack,
+      );
     }
 
-    const responseBody: Record<string, any> = {
+    const responseBody: Record<string, unknown> = {
       success: false,
       statusCode: status,
       code,

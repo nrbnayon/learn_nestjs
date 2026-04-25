@@ -46,12 +46,20 @@ export class AppLoggerService implements NestLoggerService {
 
   // ── Contextual helpers ────────────────────────────────────────────────────
 
-  http(method: string, url: string, statusCode: number, duration: number): void {
+  http(
+    method: string,
+    url: string,
+    statusCode: number,
+    duration: number,
+  ): void {
     const emoji = statusCode >= 500 ? '❌' : statusCode >= 400 ? '⚠️' : '✅';
     this.log(`${emoji} ${method} ${url} ${statusCode} ${duration}ms`, 'HTTP');
   }
 
   ws(event: string, userId: string, extra?: string): void {
-    this.debug(`[WS] ${event} | user:${userId}${extra ? ' | ' + extra : ''}`, 'WebSocket');
+    this.debug(
+      `[WS] ${event} | user:${userId}${extra ? ' | ' + extra : ''}`,
+      'WebSocket',
+    );
   }
 }

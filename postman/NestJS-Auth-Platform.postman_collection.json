@@ -14,7 +14,9 @@
     { "key": "userId", "value": "" },
     { "key": "roleId", "value": "" },
     { "key": "permissionId", "value": "" },
-    { "key": "providerAccountId", "value": "" }
+    { "key": "providerAccountId", "value": "" },
+    { "key": "otpVerificationToken", "value": "" },
+    { "key": "resetPasswordToken", "value": "" }
   ],
   "item": [
     {
@@ -40,7 +42,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"+15551234567\",\n  \"username\": \"john_doe\",\n  \"password\": \"StrongPass123!\",\n  \"tenantId\": \"{{tenantId}}\"\n}"
+              "raw": "{\n  \"fullName\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"+15551234567\",\n  \"username\": \"john_doe\",\n  \"password\": \"StrongPass123!\",\n  \"tenantId\": \"{{tenantId}}\",\n  \"otpVerification\": true,\n  \"verificationChannel\": \"email\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
           }
@@ -119,10 +121,23 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"identifier\": \"john@example.com\",\n  \"channel\": \"email\",\n  \"tenantId\": \"{{tenantId}}\"\n}"
+              "raw": "{\n  \"identifier\": \"john@example.com\",\n  \"channel\": \"email\",\n  \"tenantId\": \"{{tenantId}}\",\n  \"purpose\": \"account_verification\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/otp/send", "host": ["{{baseUrl}}"], "path": ["auth", "otp", "send"] }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const token = json?.data?.verificationToken || json?.verificationToken || null;",
+                  "if (token) { pm.collectionVariables.set('otpVerificationToken', token); }"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Verify OTP",
@@ -131,9 +146,21 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"identifier\": \"john@example.com\",\n  \"otp\": \"123456\",\n  \"tenantId\": \"{{tenantId}}\"\n}"
+              "raw": "{\n  \"identifier\": \"john@example.com\",\n  \"otp\": \"123456\",\n  \"tenantId\": \"{{tenantId}}\",\n  \"purpose\": \"account_verification\",\n  \"token\": \"{{otpVerificationToken}}\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/otp/verify", "host": ["{{baseUrl}}"], "path": ["auth", "otp", "verify"] }
+          }
+        },
+        {
+          "name": "Verify OTP (Alias)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"john@example.com\",\n  \"otp\": \"123456\",\n  \"tenantId\": \"{{tenantId}}\",\n  \"purpose\": \"account_verification\",\n  \"token\": \"{{otpVerificationToken}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/verify-otp", "host": ["{{baseUrl}}"], "path": ["auth", "verify-otp"] }
           }
         },
         {
@@ -175,10 +202,35 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"reset-token-from-email\",\n  \"newPassword\": \"NewPass123!\"\n}"
+              "raw": "{\n  \"token\": \"{{resetPasswordToken}}\",\n  \"newPassword\": \"NewPass123!\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/reset-password", "host": ["{{baseUrl}}"], "path": ["auth", "reset-password"] }
           }
+        },
+        {
+          "name": "Verify OTP (Password Reset)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"john@example.com\",\n  \"otp\": \"123456\",\n  \"tenantId\": \"{{tenantId}}\",\n  \"purpose\": \"password_reset\",\n  \"token\": \"{{otpVerificationToken}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/verify-otp", "host": ["{{baseUrl}}"], "path": ["auth", "verify-otp"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const token = json?.data?.resetToken || null;",
+                  "if (token) { pm.collectionVariables.set('resetPasswordToken', token); }"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

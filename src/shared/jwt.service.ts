@@ -27,16 +27,21 @@ export class JwtHelperService {
   ) {}
 
   generateAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
+    const expiresIn = this.configService.get<string>('jwt.expiresIn', '15m');
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.secret'),
-      expiresIn: this.configService.get<string>('jwt.expiresIn', '15m') as any,
+      expiresIn,
     });
   }
 
   generateRefreshToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
+    const expiresIn = this.configService.get<string>(
+      'jwt.refreshExpiresIn',
+      '7d',
+    );
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.refreshSecret'),
-      expiresIn: this.configService.get<string>('jwt.refreshExpiresIn', '7d') as any,
+      expiresIn,
     });
   }
 

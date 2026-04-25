@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-base-to-string */
-/* eslint-disable prettier/prettier */
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
@@ -32,13 +37,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.client = client;
       this.client.on('connect', () => this.logger.log('✅ Redis connected'));
       this.client.on('ready', () => this.logger.log('✅ Redis ready'));
-      this.client.on('close', () => this.logger.warn('Redis connection closed'));
+      this.client.on('close', () =>
+        this.logger.warn('Redis connection closed'),
+      );
       this.logger.log('Redis client initialized');
     } catch (error) {
       this.useMemoryFallback = true;
       this.client = null;
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Redis unavailable, using in-memory fallback: ${message}`);
+      this.logger.warn(
+        `Redis unavailable, using in-memory fallback: ${message}`,
+      );
     }
   }
 
@@ -169,8 +178,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async srem(key: string, ...members: string[]): Promise<void> {
     if (this.useMemoryFallback || !this.client) {
-      const existing = JSON.parse(this.memoryStore.get(key) ?? '[]') as string[];
-      this.memoryStore.set(key, JSON.stringify(existing.filter((member) => !members.includes(member))));
+      const existing = JSON.parse(
+        this.memoryStore.get(key) ?? '[]',
+      ) as string[];
+      this.memoryStore.set(
+        key,
+        JSON.stringify(existing.filter((member) => !members.includes(member))),
+      );
       return;
     }
     await this.client.srem(key, ...members);
@@ -185,7 +199,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async sismember(key: string, member: string): Promise<boolean> {
     if (this.useMemoryFallback || !this.client) {
-      return (JSON.parse(this.memoryStore.get(key) ?? '[]') as string[]).includes(member);
+      return (
+        JSON.parse(this.memoryStore.get(key) ?? '[]') as string[]
+      ).includes(member);
     }
     const result = await this.client.sismember(key, member);
     return result === 1;
@@ -210,7 +226,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async keys(pattern: string): Promise<string[]> {
     if (this.useMemoryFallback || !this.client) {
       const prefix = pattern.replace(/\*/g, '');
-      return [...this.memoryStore.keys()].filter((key) => key.startsWith(prefix));
+      return [...this.memoryStore.keys()].filter((key) =>
+        key.startsWith(prefix),
+      );
     }
     return this.client.keys(pattern);
   }

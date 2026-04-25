@@ -4,11 +4,11 @@ import { SendMessageDto } from './dto/send-message.dto';
 
 @Injectable()
 export class MessageService {
-  async listMessages(roomId: string) {
+  listMessages(_roomId: string) {
     return [];
   }
 
-  async sendMessage(dto: SendMessageDto) {
+  sendMessage(dto: SendMessageDto) {
     return {
       id: `message_${Date.now()}`,
       ...dto,
@@ -16,7 +16,7 @@ export class MessageService {
     };
   }
 
-  async markRead(dto: ReadMessageDto) {
+  markRead(dto: ReadMessageDto) {
     return {
       ...dto,
       readAt: new Date().toISOString(),

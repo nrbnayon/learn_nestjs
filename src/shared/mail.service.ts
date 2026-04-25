@@ -8,7 +8,7 @@ export interface SendMailOptions {
   html?: string;
   text?: string;
   template?: string;
-  context?: Record<string, any>;
+  context?: Record<string, string | number | undefined>;
 }
 
 @Injectable()
@@ -37,17 +37,25 @@ export class MailService {
     }
 
     try {
+      const recipients = Array.isArray(options.to)
+        ? options.to.join(', ')
+        : options.to;
       const info = await this.transporter.sendMail({
         from,
-        to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
+        to: recipients,
         subject: options.subject,
         html,
         text: options.text,
       });
-      this.logger.log(`Email sent: ${info.messageId}`);
+      this.logger.log(
+        `Email sent: ${(info as { messageId?: string }).messageId ?? 'unknown'}`,
+      );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to send email to ${options.to}: ${message}`);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      const recipients = Array.isArray(options.to)
+        ? options.to.join(', ')
+        : options.to;
+      this.logger.error(`Failed to send email to ${recipients}: ${message}`);
       throw error;
     }
   }
@@ -58,26 +66,32 @@ export class MailService {
       this.logger.log('Mail server connection verified');
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Mail server verification failed: ${message}`);
       return false;
     }
   }
 
-  private renderTemplate(template: string, context: Record<string, any>): string {
-    const templates: Record<string, (ctx: any) => string> = {
+  private renderTemplate(
+    template: string,
+    context: Record<string, string | number | undefined>,
+  ): string {
+    const templates: Record<
+      string,
+      (ctx: Record<string, string | number | undefined>) => string
+    > = {
       welcome: (ctx) => `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
           <h1 style="color:#4F46E5;">Welcome to NestJS Chat! 🎉</h1>
-          <p>Hi <strong>${ctx.displayName}</strong>,</p>
+          <p>Hi <strong>${ctx.displayName ?? ''}</strong>,</p>
           <p>Your account was created successfully. Start chatting!</p>
           <br/><p>The NestJS Chat Team</p>
         </div>`,
       'verify-email': (ctx) => `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
           <h1 style="color:#4F46E5;">Verify your email</h1>
-          <p>Hi <strong>${ctx.displayName}</strong>,</p>
-          <a href="${ctx.verificationUrl}" style="background:#4F46E5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin:16px 0;">
+          <p>Hi <strong>${ctx.displayName ?? ''}</strong>,</p>
+          <a href="${ctx.verificationUrl ?? ''}" style="background:#4F46E5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin:16px 0;">
             Verify Email
           </a>
           <p style="color:#666;font-size:12px;">Link expires in 24 hours.</p>
@@ -85,11 +99,11 @@ export class MailService {
       'password-reset': (ctx) => `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
           <h1 style="color:#4F46E5;">Reset your password</h1>
-          <p>Hi <strong>${ctx.displayName}</strong>,</p>
-          <a href="${ctx.resetUrl}" style="background:#DC2626;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin:16px 0;">
+          <p>Hi <strong>${ctx.displayName ?? ''}</strong>,</p>
+          <a href="${ctx.resetUrl ?? ''}" style="background:#DC2626;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin:16px 0;">
             Reset Password
           </a>
-          <p style="color:#666;font-size:12px;">Expires in ${ctx.expiresIn}.</p>
+          <p style="color:#666;font-size:12px;">Expires in ${ctx.expiresIn ?? ''}.</p>
         </div>`,
     };
     const fn = templates[template];

@@ -8,18 +8,21 @@ import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 
 @Injectable()
-export class CustomValidationPipe implements PipeTransform<any> {
-  async transform(value: any, { metatype }: ArgumentMetadata): Promise<any> {
+export class CustomValidationPipe implements PipeTransform<unknown, unknown> {
+  async transform(
+    value: unknown,
+    { metatype }: ArgumentMetadata,
+  ): Promise<unknown> {
     if (!metatype || !this.toValidate(metatype)) {
       return value;
     }
 
-    const object = plainToInstance(metatype, value, {
+    const object = plainToInstance(metatype as never, value as never, {
       enableImplicitConversion: true,
       excludeExtraneousValues: false,
     });
 
-    const errors = await validate(object, {
+    const errors = await validate(object as object, {
       whitelist: true,
       forbidNonWhitelisted: false,
       skipMissingProperties: false,
@@ -39,8 +42,14 @@ export class CustomValidationPipe implements PipeTransform<any> {
     return object;
   }
 
-  private toValidate(metatype: Function): boolean {
-    const types: Function[] = [String, Boolean, Number, Array, Object];
+  private toValidate(metatype: new (...args: never[]) => unknown): boolean {
+    const types: Array<new (...args: never[]) => unknown> = [
+      String,
+      Boolean,
+      Number,
+      Array,
+      Object,
+    ];
     return !types.includes(metatype);
   }
 }

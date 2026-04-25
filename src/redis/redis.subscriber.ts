@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-/* eslint-disable prettier/prettier */
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
@@ -27,12 +32,16 @@ export class RedisSubscriber implements OnModuleInit, OnModuleDestroy {
       retryStrategy: () => null,
     });
 
-    subscriber.on('error', (err) => this.logger.error('❌ Redis subscriber error', err));
+    subscriber.on('error', (err) =>
+      this.logger.error('❌ Redis subscriber error', err),
+    );
 
     try {
       await subscriber.connect();
       this.subscriber = subscriber;
-      this.subscriber.on('connect', () => this.logger.log('✅ Redis subscriber connected'));
+      this.subscriber.on('connect', () =>
+        this.logger.log('✅ Redis subscriber connected'),
+      );
 
       this.subscriber.on('message', (channel: string, message: string) => {
         const channelHandlers = this.handlers.get(channel);
@@ -47,18 +56,24 @@ export class RedisSubscriber implements OnModuleInit, OnModuleDestroy {
         }
       });
 
-      this.subscriber.on('pmessage', (pattern: string, channel: string, message: string) => {
-        const patternHandlers = this.handlers.get(pattern);
-        if (patternHandlers) {
-          patternHandlers.forEach((handler) => {
-            try {
-              handler(channel, message);
-            } catch (err) {
-              this.logger.error(`Error in pmessage handler for pattern ${pattern}`, err);
-            }
-          });
-        }
-      });
+      this.subscriber.on(
+        'pmessage',
+        (pattern: string, channel: string, message: string) => {
+          const patternHandlers = this.handlers.get(pattern);
+          if (patternHandlers) {
+            patternHandlers.forEach((handler) => {
+              try {
+                handler(channel, message);
+              } catch (err) {
+                this.logger.error(
+                  `Error in pmessage handler for pattern ${pattern}`,
+                  err,
+                );
+              }
+            });
+          }
+        },
+      );
     } catch (error) {
       this.disabled = true;
       this.subscriber = null;
@@ -78,7 +93,10 @@ export class RedisSubscriber implements OnModuleInit, OnModuleDestroy {
   /**
    * Subscribe to a Redis channel and register a handler.
    */
-  async subscribe(channel: string, handler: RedisMessageHandler): Promise<void> {
+  async subscribe(
+    channel: string,
+    handler: RedisMessageHandler,
+  ): Promise<void> {
     if (this.disabled || !this.subscriber) return;
     if (!this.handlers.has(channel)) {
       this.handlers.set(channel, new Set());
@@ -91,7 +109,10 @@ export class RedisSubscriber implements OnModuleInit, OnModuleDestroy {
   /**
    * Subscribe to a Redis pattern channel.
    */
-  async psubscribe(pattern: string, handler: RedisMessageHandler): Promise<void> {
+  async psubscribe(
+    pattern: string,
+    handler: RedisMessageHandler,
+  ): Promise<void> {
     if (this.disabled || !this.subscriber) return;
     if (!this.handlers.has(pattern)) {
       this.handlers.set(pattern, new Set());
@@ -104,7 +125,10 @@ export class RedisSubscriber implements OnModuleInit, OnModuleDestroy {
   /**
    * Unsubscribe a specific handler from a channel.
    */
-  async unsubscribe(channel: string, handler: RedisMessageHandler): Promise<void> {
+  async unsubscribe(
+    channel: string,
+    handler: RedisMessageHandler,
+  ): Promise<void> {
     if (this.disabled || !this.subscriber) return;
     const channelHandlers = this.handlers.get(channel);
     if (!channelHandlers) return;

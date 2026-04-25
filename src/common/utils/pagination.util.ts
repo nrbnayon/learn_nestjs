@@ -37,7 +37,10 @@ export class PaginationUtil {
   /**
    * Convert page/limit to Prisma skip/take.
    */
-  static toPrisma(options: Required<PaginationOptions>): { skip: number; take: number } {
+  static toPrisma(options: Required<PaginationOptions>): {
+    skip: number;
+    take: number;
+  } {
     return {
       skip: (options.page - 1) * options.limit,
       take: options.limit,

@@ -24,7 +24,7 @@ export class SocketStateService {
     if (!this.userSockets.has(userId)) {
       this.userSockets.set(userId, new Set());
     }
-    this.userSockets.get(userId)!.add(socket.id);
+    this.userSockets.get(userId).add(socket.id);
     this.socketUser.set(socket.id, userId);
     await this.redisService.set(`user:${userId}:online`, 'true', 120);
     await this.redisService.publishJson('presence.events', {
@@ -54,7 +54,9 @@ export class SocketStateService {
           socketId,
           at: new Date().toISOString(),
         });
-        this.logger.debug(`User ${userId} is now offline (last socket removed)`);
+        this.logger.debug(
+          `User ${userId} is now offline (last socket removed)`,
+        );
       }
     }
     return userId;

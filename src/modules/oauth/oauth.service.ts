@@ -12,7 +12,7 @@ export class OauthService {
     accessToken?: string;
     refreshToken?: string;
   }) {
-    return (this.prisma as any).oAuthAccount.upsert({
+    return this.prisma.oAuthAccount.upsert({
       where: {
         provider_providerAccountId: {
           provider: data.provider,
@@ -28,7 +28,7 @@ export class OauthService {
   }
 
   async getUserByProvider(provider: string, providerAccountId: string) {
-    const account = await (this.prisma as any).oAuthAccount.findFirst({
+    const account = await this.prisma.oAuthAccount.findFirst({
       where: { provider, providerAccountId },
       include: { user: true },
     });

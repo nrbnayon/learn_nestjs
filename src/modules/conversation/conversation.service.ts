@@ -3,15 +3,15 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 
 @Injectable()
 export class ConversationService {
-  async listConversations() {
+  listConversations() {
     return [];
   }
 
-  async getConversation(conversationId: string) {
+  getConversation(conversationId: string) {
     return { id: conversationId };
   }
 
-  async createConversation(dto: CreateConversationDto) {
+  createConversation(dto: CreateConversationDto) {
     return {
       id: `conversation_${Date.now()}`,
       ...dto,

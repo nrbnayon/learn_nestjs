@@ -6,7 +6,7 @@ export class AuditService {
   constructor(private readonly prisma: PrismaService) {}
 
   list(limit = 50) {
-    return (this.prisma as any).auditLog.findMany({
+    return this.prisma.auditLog.findMany({
       orderBy: { createdAt: 'desc' },
       take: limit,
     });

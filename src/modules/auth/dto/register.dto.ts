@@ -1,10 +1,10 @@
-/* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsEmail,
+  IsBoolean,
   IsIn,
   IsNotEmpty,
   IsOptional,
@@ -56,16 +56,38 @@ export class RegisterDto {
   tenantId?: string;
 
   @ApiProperty({
+    example: false,
+    required: false,
+    description:
+      'When true, account verification is done with OTP instead of email link',
+  })
+  @IsOptional()
+  @IsBoolean()
+  otpVerification?: boolean;
+
+  @ApiProperty({
+    example: 'email',
+    required: false,
+    enum: ['email', 'phone'],
+    description: 'Preferred channel for OTP verification',
+  })
+  @IsOptional()
+  @IsIn(['email', 'phone'])
+  verificationChannel?: 'email' | 'phone';
+
+  @ApiProperty({
     example: 'MySecurePass123!',
     required: false,
-    description: 'Password (min 8 chars, must contain uppercase, lowercase, number)',
+    description:
+      'Password (min 8 chars, must contain uppercase, lowercase, number)',
   })
   @IsOptional()
   @IsString()
   @MinLength(8, { message: 'Password must be at least 8 characters' })
   @MaxLength(100)
   @Matches(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+    message:
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number',
   })
   password?: string;
 }
@@ -94,6 +116,15 @@ export class OtpSendDto {
   @IsOptional()
   @IsString()
   tenantId?: string;
+
+  @ApiProperty({
+    example: 'login',
+    enum: ['login', 'account_verification', 'password_reset'],
+    required: false,
+  })
+  @IsOptional()
+  @IsIn(['login', 'account_verification', 'password_reset'])
+  purpose?: 'login' | 'account_verification' | 'password_reset';
 }
 
 export class OtpVerifyDto {
@@ -111,6 +142,24 @@ export class OtpVerifyDto {
   @IsOptional()
   @IsString()
   tenantId?: string;
+
+  @ApiProperty({
+    example: 'login',
+    enum: ['login', 'account_verification', 'password_reset'],
+    required: false,
+  })
+  @IsOptional()
+  @IsIn(['login', 'account_verification', 'password_reset'])
+  purpose?: 'login' | 'account_verification' | 'password_reset';
+
+  @ApiProperty({
+    example: '253b75f5f61244e1887f0a95d4115dc4',
+    required: false,
+    description: 'Optional OTP verification token returned from /auth/otp/send',
+  })
+  @IsOptional()
+  @IsString()
+  token?: string;
 }
 
 export class ResetPasswordDto {

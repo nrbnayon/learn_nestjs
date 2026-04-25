@@ -14,13 +14,15 @@ export class NotificationProcessor extends WorkerHost {
   }
 
   async process(job: Job<SendNotificationJobData>): Promise<void> {
-    this.logger.log(`Processing notification job [${job.id}] → user:${job.data.userId}`);
+    this.logger.log(
+      `Processing notification job [${job.id}] → user:${job.data.userId}`,
+    );
 
     try {
       await this.prisma.notification.create({
         data: {
           userId: job.data.userId,
-          type: job.data.type as any,
+          type: job.data.type,
           title: job.data.title,
           body: job.data.body,
           data: job.data.data ?? {},
@@ -30,7 +32,10 @@ export class NotificationProcessor extends WorkerHost {
       this.logger.log(`✅ Notification persisted for user ${job.data.userId}`);
     } catch (error) {
       const stack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(`❌ Failed to process notification for user ${job.data.userId}`, stack);
+      this.logger.error(
+        `❌ Failed to process notification for user ${job.data.userId}`,
+        stack,
+      );
       throw error;
     }
   }

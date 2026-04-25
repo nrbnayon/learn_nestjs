@@ -10,6 +10,7 @@ import {
   PERMISSION_KEY,
   RESOURCE_OWNER_PARAM_KEY,
 } from '../decorators/permissions.decorator';
+import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -25,12 +26,8 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<Request>();
-    const user = request.user as {
-      id: string;
-      roles?: string[];
-      permissions?: string[];
-    };
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const user = request.user;
 
     if (!user) {
       throw new ForbiddenException('User context missing');
@@ -52,9 +49,15 @@ export class PermissionsGuard implements CanActivate {
 
     if (ownerParam) {
       const ownerId =
-        request.params?.[ownerParam] ??
-        request.body?.[ownerParam] ??
-        request.query?.[ownerParam];
+        this.getStringValue(request.params, ownerParam) ??
+        this.getStringValue(
+          request.body as Record<string, unknown> | undefined,
+          ownerParam,
+        ) ??
+        this.getStringValue(
+          request.query as Record<string, unknown> | undefined,
+          ownerParam,
+        );
 
       const roles = new Set(
         (user.roles ?? []).map((role) => role.toLowerCase()),
@@ -70,5 +73,13 @@ export class PermissionsGuard implements CanActivate {
     }
 
     throw new ForbiddenException('Missing required permissions');
+  }
+
+  private getStringValue(
+    source: Record<string, unknown> | undefined,
+    key: string,
+  ): string | undefined {
+    const value = source?.[key];
+    return typeof value === 'string' ? value : undefined;
   }
 }

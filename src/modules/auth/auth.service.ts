@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import {
   BadRequestException,
   ConflictException,
@@ -29,6 +32,11 @@ import { LoginDto } from './dto/login.dto';
 
 const BCRYPT_ROUNDS = 12;
 const OTP_TTL_SECONDS = 5 * 60;
+const PASSWORD_RESET_OTP_TTL_SECONDS = 10 * 60;
+const PASSWORD_RESET_TOKEN_TTL_MS = 10 * 60 * 1000;
+const OTP_MAX_RESEND_ATTEMPTS = 3;
+const OTP_MAX_INVALID_ATTEMPTS = 3;
+const OTP_BLOCK_SECONDS = 6 * 60 * 60;
 const LOGIN_LIMIT_WINDOW_SECONDS = 60;
 const LOGIN_LIMIT_MAX_ATTEMPTS = 10;
 
@@ -42,6 +50,19 @@ interface AuthContext {
 
 type VerifyPlatform = 'web' | 'app';
 type VerifyResult = 'success' | 'failure';
+type OtpChannel = 'email' | 'phone';
+type OtpPurpose = 'login' | 'account_verification' | 'password_reset';
+
+interface OtpPayload {
+  identifier: string;
+  channel: OtpChannel;
+  code: string;
+  purpose: OtpPurpose;
+  tenantId: string | null;
+  token: string;
+  userId?: string;
+  createdAt: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -77,7 +98,21 @@ export class AuthService {
       ? this.jwtHelper.generateSecureToken()
       : null;
 
-    const prismaUnsafe = this.prisma as any;
+    const shouldUseOtpVerification = Boolean(dto.otpVerification) || !dto.email;
+    const requestedVerificationChannel: OtpChannel | undefined =
+      dto.verificationChannel === 'phone'
+        ? 'phone'
+        : dto.verificationChannel === 'email'
+          ? 'email'
+          : undefined;
+    const resolvedVerificationChannel = this.resolveVerificationChannel(
+      requestedVerificationChannel,
+      dto.email,
+      dto.phone,
+      shouldUseOtpVerification,
+    );
+
+    const prismaUnsafe = this.prisma;
     const user = await prismaUnsafe.user.create({
       data: {
         fullName: dto.fullName,
@@ -87,24 +122,81 @@ export class AuthService {
         password,
         role: 'USER',
         tenantId,
-        emailVerifyToken,
-        status: 'ACTIVE',
+        emailVerifyToken: shouldUseOtpVerification ? null : emailVerifyToken,
+        status: 'PENDING_VERIFICATION',
       },
     });
 
     await this.ensureDefaultRole(user.id, tenantId);
 
-    if (dto.email && emailVerifyToken) {
-      await this.sendEmailVerification(dto.email, dto.fullName, emailVerifyToken);
+    if (!shouldUseOtpVerification && dto.email && emailVerifyToken) {
+      await this.sendEmailVerification(
+        dto.email,
+        dto.fullName,
+        emailVerifyToken,
+        'web',
+      );
     }
 
-    await this.audit('auth.user.created', user.id, tenantId, {
-      username: user.username,
-      email: user.email,
-    }, ctx);
+    let verificationToken: string | undefined;
+    let verificationExpiresIn: number | undefined;
 
-    const tokens = await this.issueTokens(user.id, tenantId, ctx);
-    return { user: this.sanitizeUser(user), tokens };
+    if (shouldUseOtpVerification && resolvedVerificationChannel) {
+      const otpResult = await this.sendOtp(
+        {
+          identifier:
+            resolvedVerificationChannel === 'email'
+              ? (dto.email ?? '')
+              : (dto.phone ?? ''),
+          channel: resolvedVerificationChannel,
+          tenantId: tenantId ?? undefined,
+          purpose: 'account_verification',
+        },
+        ctx,
+      );
+
+      if ('verificationToken' in otpResult) {
+        verificationToken = otpResult.verificationToken;
+      }
+      verificationExpiresIn = otpResult.expiresIn;
+    }
+
+    await this.audit(
+      'auth.user.created',
+      user.id,
+      tenantId,
+      {
+        username: user.username,
+        email: user.email,
+      },
+      ctx,
+    );
+
+    return {
+      message: this.buildRegisterSuccessMessage({
+        channel: resolvedVerificationChannel,
+        identifier:
+          resolvedVerificationChannel === 'email'
+            ? user.email
+            : resolvedVerificationChannel === 'phone'
+              ? user.phone
+              : user.email,
+        verificationType: shouldUseOtpVerification ? 'otp' : 'link',
+      }),
+      data: {
+        verificationRequired: true,
+        verificationType: shouldUseOtpVerification ? 'otp' : 'link',
+        channel: resolvedVerificationChannel,
+        identifier:
+          resolvedVerificationChannel === 'email'
+            ? user.email
+            : resolvedVerificationChannel === 'phone'
+              ? user.phone
+              : user.email,
+        expiresIn: verificationExpiresIn,
+        verificationToken,
+      },
+    };
   }
 
   async login(dto: LoginDto, ctx: AuthContext = {}) {
@@ -119,14 +211,18 @@ export class AuthService {
     }
 
     if (!dto.password) {
-      throw new BadRequestException('Password is required for this login method');
+      throw new BadRequestException(
+        'Password is required for this login method',
+      );
     }
 
     const tenantId = await this.resolveTenantId(ctx.tenantId, ctx.tenantDomain);
     const user = await this.findUserByIdentifier(dto.identifier, tenantId);
 
     if (!user?.password) {
-      throw new UnauthorizedException('Password login is not enabled for this account');
+      throw new UnauthorizedException(
+        'Password login is not enabled for this account',
+      );
     }
 
     const isValidPassword = await bcrypt.compare(dto.password, user.password);
@@ -138,13 +234,21 @@ export class AuthService {
       throw new UnauthorizedException('This account is banned');
     }
 
+    this.assertUserCanAuthenticate(user);
+
     await this.touchPresence(user.id, true);
     const tokens = await this.issueTokens(user.id, tenantId, ctx);
 
-    await this.audit('auth.user.login', user.id, tenantId, {
-      method: 'password',
-      identifier: dto.identifier,
-    }, ctx);
+    await this.audit(
+      'auth.user.login',
+      user.id,
+      tenantId,
+      {
+        method: 'password',
+        identifier: dto.identifier,
+      },
+      ctx,
+    );
 
     return {
       user: await this.getSafeUserById(user.id),
@@ -153,68 +257,228 @@ export class AuthService {
   }
 
   async sendOtp(dto: OtpSendDto, ctx: AuthContext = {}) {
-    const tenantId = await this.resolveTenantId(dto.tenantId ?? ctx.tenantId, ctx.tenantDomain);
+    const purpose: OtpPurpose = dto.purpose ?? 'login';
+    const tenantId = await this.resolveTenantId(
+      dto.tenantId ?? ctx.tenantId,
+      ctx.tenantDomain,
+    );
     const identifier = dto.identifier.trim();
-    const otp = dto.channel === 'phone' ? '123456' : this.jwtHelper.generateOtpCode(6);
-    const key = this.otpKey(dto.channel, identifier, tenantId);
+    await this.assertOtpNotBlocked(purpose, identifier, tenantId);
+    const otp =
+      dto.channel === 'phone' ? '123456' : this.jwtHelper.generateOtpCode(6);
+    const user = await this.findUserByIdentifier(identifier, tenantId);
+
+    if (purpose === 'account_verification') {
+      if (!user) {
+        throw new NotFoundException('User not found for OTP identifier');
+      }
+
+      if (dto.channel === 'email' && user.isEmailVerified) {
+        throw new BadRequestException('Email is already verified');
+      }
+
+      if (dto.channel === 'phone' && user.isPhoneVerified) {
+        throw new BadRequestException('Phone is already verified');
+      }
+    }
+
+    if (purpose === 'password_reset' && !user) {
+      // Keep password reset behavior non-enumerable.
+      return {
+        success: true,
+        channel: dto.channel,
+        purpose,
+        expiresIn: PASSWORD_RESET_OTP_TTL_SECONDS,
+      };
+    }
+
+    const verificationToken = this.jwtHelper.generateSecureToken();
+    const payload: OtpPayload = {
+      identifier,
+      channel: dto.channel,
+      code: otp,
+      purpose,
+      tenantId,
+      token: verificationToken,
+      userId: user?.id,
+      createdAt: new Date().toISOString(),
+    };
+
+    const ttl =
+      purpose === 'password_reset'
+        ? PASSWORD_RESET_OTP_TTL_SECONDS
+        : OTP_TTL_SECONDS;
+    await this.bumpOtpResendCounter(purpose, identifier, tenantId, ttl);
 
     await this.redisService.setJson(
-      key,
-      {
-        identifier,
-        channel: dto.channel,
-        code: otp,
-        tenantId,
-        createdAt: new Date().toISOString(),
-      },
-      OTP_TTL_SECONDS,
+      this.otpKey(purpose, dto.channel, identifier, tenantId),
+      payload,
+      ttl,
+    );
+
+    await this.redisService.setJson(
+      this.otpTokenKey(purpose, verificationToken),
+      payload,
+      ttl,
     );
 
     if (dto.channel === 'email') {
+      const purposeLabel =
+        purpose === 'account_verification'
+          ? 'account verification'
+          : purpose === 'password_reset'
+            ? 'password reset'
+            : 'login';
+
       await this.mailService.sendMail({
         to: identifier,
-        subject: 'Your OTP Code',
-        html: `<p>Your OTP is <strong>${otp}</strong>. It expires in 5 minutes.</p>`,
+        subject:
+          purpose === 'password_reset'
+            ? 'Your password reset OTP'
+            : 'Your OTP Code',
+        html: `
+          <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111;max-width:600px;margin:0 auto;">
+            <h2 style="margin-bottom:12px;">One-time verification code</h2>
+            <p>Use this code to complete your ${purposeLabel}:</p>
+            <p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:12px 0;">${otp}</p>
+            <p>This code expires in <strong>${Math.floor(ttl / 60)} minutes</strong>.</p>
+            <p>You can request a new code up to <strong>${OTP_MAX_RESEND_ATTEMPTS} times</strong>. If you exceed the limit or enter the wrong code ${OTP_MAX_INVALID_ATTEMPTS} times, OTP verification will be blocked for 6 hours.</p>
+            <p>If you did not request this, please ignore this email.</p>
+          </div>
+        `,
       });
     }
 
     return {
       success: true,
       channel: dto.channel,
-      expiresIn: OTP_TTL_SECONDS,
+      purpose,
+      expiresIn: ttl,
+      verificationToken,
       ...(dto.channel === 'phone' ? { otp } : {}),
     };
   }
 
   async verifyOtp(dto: OtpVerifyDto, ctx: AuthContext = {}) {
-    const tenantId = await this.resolveTenantId(dto.tenantId ?? ctx.tenantId, ctx.tenantDomain);
-
-    const emailOtp = await this.redisService.getJson<{ code: string }>(
-      this.otpKey('email', dto.identifier, tenantId),
-    );
-    const phoneOtp = await this.redisService.getJson<{ code: string }>(
-      this.otpKey('phone', dto.identifier, tenantId),
+    const purpose: OtpPurpose = dto.purpose ?? 'login';
+    const tenantId = await this.resolveTenantId(
+      dto.tenantId ?? ctx.tenantId,
+      ctx.tenantDomain,
     );
 
-    const stored = emailOtp ?? phoneOtp;
+    const identifier = dto.identifier.trim();
+    await this.assertOtpNotBlocked(purpose, identifier, tenantId);
+    const stored = await this.findStoredOtp({
+      identifier,
+      tenantId,
+      purpose,
+      token: dto.token,
+    });
+
     if (!stored || stored.code !== dto.otp) {
+      await this.bumpOtpInvalidAttempts(purpose, identifier, tenantId);
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    const user = await this.findUserByIdentifier(dto.identifier, tenantId);
+    await this.clearOtpGuardKeys(purpose, identifier, tenantId);
+
+    const user = stored.userId
+      ? await this.prisma.user.findUnique({
+          where: { id: stored.userId },
+        })
+      : await this.findUserByIdentifier(identifier, tenantId);
+
     if (!user) {
       throw new NotFoundException('User not found for OTP identifier');
     }
 
-    await this.redisService.del(this.otpKey('email', dto.identifier, tenantId));
-    await this.redisService.del(this.otpKey('phone', dto.identifier, tenantId));
+    await this.deleteOtpPayload(stored);
+
+    if (purpose === 'account_verification') {
+      const updateData: Record<string, unknown> = {};
+
+      if (stored.channel === 'email') {
+        updateData.isEmailVerified = true;
+        updateData.emailVerifyToken = null;
+      }
+
+      if (stored.channel === 'phone') {
+        updateData.isPhoneVerified = true;
+      }
+
+      updateData.status = 'ACTIVE';
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+      });
+
+      await this.audit(
+        'auth.user.verified',
+        user.id,
+        tenantId,
+        {
+          channel: stored.channel,
+          method: 'otp',
+        },
+        ctx,
+      );
+
+      return {
+        message: `Account verified successfully via ${stored.channel} OTP. You can now log in.`,
+        data: {
+          verified: true,
+          channel: stored.channel,
+        },
+      };
+    }
+
+    if (purpose === 'password_reset') {
+      const resetToken = this.jwtHelper.generateSecureToken();
+      const resetExpires = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordResetToken: resetToken,
+          passwordResetExpires: resetExpires,
+        },
+      });
+
+      await this.audit(
+        'auth.password.reset.otp_verified',
+        user.id,
+        tenantId,
+        {
+          channel: stored.channel,
+        },
+        ctx,
+      );
+
+      return {
+        message:
+          'OTP verified successfully. Use the reset token to set a new password.',
+        data: {
+          resetToken,
+          expiresIn: Math.floor(PASSWORD_RESET_TOKEN_TTL_MS / 1000),
+        },
+      };
+    }
+
+    this.assertUserCanAuthenticate(user);
     await this.touchPresence(user.id, true);
 
     const tokens = await this.issueTokens(user.id, tenantId, ctx);
-    await this.audit('auth.user.login', user.id, tenantId, {
-      method: 'otp',
-      identifier: dto.identifier,
-    }, ctx);
+    await this.audit(
+      'auth.user.login',
+      user.id,
+      tenantId,
+      {
+        method: 'otp',
+        identifier,
+      },
+      ctx,
+    );
 
     return {
       user: await this.getSafeUserById(user.id),
@@ -233,8 +497,11 @@ export class AuthService {
     await this.audit('auth.user.logout', userId, ctx.tenantId, {}, ctx);
   }
 
-  async refreshTokens(dto: RefreshTokenDto, ctx: AuthContext = {}): Promise<TokenPair> {
-    let payload: any;
+  async refreshTokens(
+    dto: RefreshTokenDto,
+    ctx: AuthContext = {},
+  ): Promise<TokenPair> {
+    let payload: { sub: string; tenantId?: string };
     try {
       payload = this.jwtHelper.verifyRefreshToken(dto.refreshToken);
     } catch {
@@ -254,7 +521,7 @@ export class AuthService {
   }
 
   async verifyEmail(dto: VerifyEmailDto): Promise<void> {
-    const user = await (this.prisma as any).user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: { emailVerifyToken: dto.token },
     });
 
@@ -262,7 +529,7 @@ export class AuthService {
       throw new BadRequestException('Invalid verification token');
     }
 
-    await (this.prisma as any).user.update({
+    await this.prisma.user.update({
       where: { id: user.id },
       data: {
         isEmailVerified: true,
@@ -273,7 +540,7 @@ export class AuthService {
   }
 
   async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
-    const user = await (this.prisma as any).user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: { email: dto.email.toLowerCase() },
     });
 
@@ -281,27 +548,16 @@ export class AuthService {
       return;
     }
 
-    const resetToken = this.jwtHelper.generateSecureToken();
-    const resetExpires = new Date(Date.now() + 60 * 60 * 1000);
-
-    await (this.prisma as any).user.update({
-      where: { id: user.id },
-      data: {
-        passwordResetToken: resetToken,
-        passwordResetExpires: resetExpires,
-      },
-    });
-
-    const resetUrl = this.buildApiUrl(`/auth/reset-password?token=${resetToken}`);
-    await this.mailService.sendMail({
-      to: user.email,
-      subject: 'Reset Password',
-      html: `<p>Hello ${user.fullName}, reset link: ${resetUrl}</p>`,
+    await this.sendOtp({
+      identifier: dto.email,
+      channel: 'email',
+      tenantId: user.tenantId ?? undefined,
+      purpose: 'password_reset',
     });
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
-    const user = await (this.prisma as any).user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: {
         passwordResetToken: dto.token,
         passwordResetExpires: { gt: new Date() },
@@ -312,7 +568,7 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
-    await (this.prisma as any).user.update({
+    await this.prisma.user.update({
       where: { id: user.id },
       data: {
         password: await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS),
@@ -325,7 +581,9 @@ export class AuthService {
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
-    const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -339,7 +597,7 @@ export class AuthService {
       throw new UnauthorizedException('Current password is incorrect');
     }
 
-    await (this.prisma as any).user.update({
+    await this.prisma.user.update({
       where: { id: userId },
       data: { password: await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS) },
     });
@@ -378,7 +636,11 @@ export class AuthService {
         );
   }
 
-  private async issueTokens(userId: string, tenantId: string | null, ctx: AuthContext): Promise<TokenPair> {
+  private async issueTokens(
+    userId: string,
+    tenantId: string | null,
+    ctx: AuthContext,
+  ): Promise<TokenPair> {
     const { roles, permissions } = await this.buildAuthorizationClaims(userId);
 
     const tokens = this.jwtHelper.generateTokenPair({
@@ -412,8 +674,10 @@ export class AuthService {
     return tokens;
   }
 
-  private async buildAuthorizationClaims(userId: string): Promise<{ roles: string[]; permissions: string[] }> {
-    const user = await (this.prisma as any).user.findUnique({
+  private async buildAuthorizationClaims(
+    userId: string,
+  ): Promise<{ roles: string[]; permissions: string[] }> {
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
         roles: {
@@ -452,14 +716,18 @@ export class AuthService {
     for (const role of user?.roles ?? []) {
       for (const permission of role?.role?.permissions ?? []) {
         if (permission?.permission?.action && permission?.permission?.subject) {
-          permissionSet.add(`${permission.permission.action}:${permission.permission.subject}`);
+          permissionSet.add(
+            `${permission.permission.action}:${permission.permission.subject}`,
+          );
         }
       }
     }
 
     for (const permission of user?.permissions ?? []) {
       if (permission?.permission?.action && permission?.permission?.subject) {
-        permissionSet.add(`${permission.permission.action}:${permission.permission.subject}`);
+        permissionSet.add(
+          `${permission.permission.action}:${permission.permission.subject}`,
+        );
       }
     }
 
@@ -473,8 +741,9 @@ export class AuthService {
     return this.verifyOtp(
       {
         identifier: dto.identifier,
-        otp: dto.otp!,
+        otp: dto.otp,
         tenantId: ctx.tenantId,
+        purpose: 'login',
       },
       ctx,
     );
@@ -482,7 +751,7 @@ export class AuthService {
 
   private async loginWithOAuthProvider(dto: LoginDto, ctx: AuthContext) {
     const tenantId = await this.resolveTenantId(ctx.tenantId, ctx.tenantDomain);
-    const account = await (this.prisma as any).oAuthAccount.findFirst({
+    const account = await this.prisma.oAuthAccount.findFirst({
       where: {
         provider: dto.provider,
         providerAccountId: dto.identifier,
@@ -494,11 +763,19 @@ export class AuthService {
       throw new UnauthorizedException('OAuth account is not connected');
     }
 
+    this.assertUserCanAuthenticate(account.user);
+
     const tokens = await this.issueTokens(account.user.id, tenantId, ctx);
-    await this.audit('auth.user.login', account.user.id, tenantId, {
-      method: 'oauth',
-      provider: dto.provider,
-    }, ctx);
+    await this.audit(
+      'auth.user.login',
+      account.user.id,
+      tenantId,
+      {
+        method: 'oauth',
+        provider: dto.provider,
+      },
+      ctx,
+    );
 
     return {
       user: this.sanitizeUser(account.user),
@@ -521,7 +798,10 @@ export class AuthService {
     }
   }
 
-  private async resolveTenantId(tenantId?: string, tenantDomain?: string): Promise<string | null> {
+  private async resolveTenantId(
+    tenantId?: string,
+    tenantDomain?: string,
+  ): Promise<string | null> {
     if (tenantId) {
       return tenantId;
     }
@@ -530,7 +810,7 @@ export class AuthService {
       return null;
     }
 
-    const tenant = await (this.prisma as any).tenant.findFirst({
+    const tenant = await this.prisma.tenant.findFirst({
       where: { domain: tenantDomain },
       select: { id: true },
     });
@@ -542,14 +822,19 @@ export class AuthService {
     return tenant.id;
   }
 
-  private async resolveUsername(providedUsername: string | undefined, fullName: string): Promise<string> {
-    const base = (providedUsername?.trim() || this.slugify(fullName)).toLowerCase();
+  private async resolveUsername(
+    providedUsername: string | undefined,
+    fullName: string,
+  ): Promise<string> {
+    const base = (
+      providedUsername?.trim() || this.slugify(fullName)
+    ).toLowerCase();
 
     let candidate = base;
     let tries = 0;
 
     while (tries < 10) {
-      const existing = await (this.prisma as any).user.findFirst({
+      const existing = await this.prisma.user.findFirst({
         where: { username: candidate },
         select: { id: true },
       });
@@ -588,7 +873,7 @@ export class AuthService {
       return;
     }
 
-    const existing = await (this.prisma as any).user.findFirst({
+    const existing = await this.prisma.user.findFirst({
       where: { OR: whereOr },
     });
 
@@ -598,7 +883,7 @@ export class AuthService {
   }
 
   private async ensureDefaultRole(userId: string, tenantId: string | null) {
-    const prismaUnsafe = this.prisma as any;
+    const prismaUnsafe = this.prisma;
 
     try {
       let role = await prismaUnsafe.appRole.findFirst({
@@ -624,7 +909,7 @@ export class AuthService {
   }
 
   private async getSafeUserById(userId: string) {
-    const user = await (this.prisma as any).user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -655,7 +940,7 @@ export class AuthService {
     };
   }
 
-  private sanitizeUser(user: any) {
+  private sanitizeUser(user: Record<string, unknown>) {
     if (!user) {
       return user;
     }
@@ -672,10 +957,10 @@ export class AuthService {
     return safe;
   }
 
-  private async findUserByIdentifier(identifier: string, tenantId: string | null) {
+  private findUserByIdentifier(identifier: string, tenantId: string | null) {
     const normalized = identifier.trim();
 
-    return (this.prisma as any).user.findFirst({
+    return this.prisma.user.findFirst({
       where: {
         tenantId,
         OR: [
@@ -687,8 +972,137 @@ export class AuthService {
     });
   }
 
-  private async sendEmailVerification(email: string, fullName: string, token: string) {
-    const verificationUrl = this.buildApiUrl(`/auth/verify-email?token=${token}`);
+  private assertUserCanAuthenticate(user: {
+    status?: string;
+    isEmailVerified?: boolean;
+    isPhoneVerified?: boolean;
+  }) {
+    if (
+      user.status === 'PENDING_VERIFICATION' &&
+      !user.isEmailVerified &&
+      !user.isPhoneVerified
+    ) {
+      throw new UnauthorizedException(
+        'Account is not verified yet. Please complete verification first.',
+      );
+    }
+  }
+
+  private resolveVerificationChannel(
+    preferredChannel: OtpChannel | undefined,
+    email: string | undefined,
+    phone: string | undefined,
+    useOtpVerification: boolean,
+  ): OtpChannel | undefined {
+    if (useOtpVerification) {
+      if (preferredChannel === 'email' && !email) {
+        throw new BadRequestException(
+          'verificationChannel=email requires an email',
+        );
+      }
+
+      if (preferredChannel === 'phone' && !phone) {
+        throw new BadRequestException(
+          'verificationChannel=phone requires a phone number',
+        );
+      }
+
+      if (preferredChannel) {
+        return preferredChannel;
+      }
+
+      if (email) {
+        return 'email';
+      }
+
+      if (phone) {
+        return 'phone';
+      }
+
+      throw new BadRequestException(
+        'A valid email or phone is required for OTP verification',
+      );
+    }
+
+    if (email) {
+      return 'email';
+    }
+
+    if (phone) {
+      return 'phone';
+    }
+
+    return undefined;
+  }
+
+  private buildRegisterSuccessMessage(params: {
+    channel?: OtpChannel;
+    identifier?: string | null;
+    verificationType: 'otp' | 'link';
+  }): string {
+    const destination =
+      params.identifier ??
+      (params.channel === 'phone' ? 'your phone number' : 'your email');
+
+    if (params.verificationType === 'otp') {
+      return `Account created successfully. Check ${destination} for a 6-digit OTP (valid for 5 minutes).`;
+    }
+
+    return `Account created successfully. Check ${destination} for your verification link.`;
+  }
+
+  private async findStoredOtp(params: {
+    identifier: string;
+    tenantId: string | null;
+    purpose: OtpPurpose;
+    token?: string;
+  }): Promise<OtpPayload | null> {
+    if (params.token) {
+      const byToken = await this.redisService.getJson<OtpPayload>(
+        this.otpTokenKey(params.purpose, params.token),
+      );
+
+      if (
+        byToken &&
+        byToken.identifier.toLowerCase() === params.identifier.toLowerCase()
+      ) {
+        return byToken;
+      }
+    }
+
+    const emailOtp = await this.redisService.getJson<OtpPayload>(
+      this.otpKey(params.purpose, 'email', params.identifier, params.tenantId),
+    );
+    const phoneOtp = await this.redisService.getJson<OtpPayload>(
+      this.otpKey(params.purpose, 'phone', params.identifier, params.tenantId),
+    );
+
+    return emailOtp ?? phoneOtp;
+  }
+
+  private async deleteOtpPayload(payload: OtpPayload): Promise<void> {
+    await this.redisService.del(
+      this.otpKey(
+        payload.purpose,
+        payload.channel,
+        payload.identifier,
+        payload.tenantId,
+      ),
+    );
+    await this.redisService.del(
+      this.otpTokenKey(payload.purpose, payload.token),
+    );
+  }
+
+  private async sendEmailVerification(
+    email: string,
+    fullName: string,
+    token: string,
+    platform: VerifyPlatform = 'web',
+  ) {
+    const verificationUrl = this.buildApiUrl(
+      `/auth/verify-email?token=${token}&platform=${platform}`,
+    );
     await this.mailService.sendMail({
       to: email,
       subject: 'Verify your email',
@@ -697,7 +1111,10 @@ export class AuthService {
   }
 
   private buildApiUrl(path: string): string {
-    const baseUrl = this.configService.get<string>('app.baseUrl', 'http://localhost:3001');
+    const baseUrl = this.configService.get<string>(
+      'app.baseUrl',
+      'http://localhost:3001',
+    );
     const apiPrefix = this.configService.get<string>('app.apiPrefix', 'api/v1');
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
     return `${baseUrl}/${apiPrefix}${normalizedPath}`;
@@ -706,7 +1123,9 @@ export class AuthService {
   private async revokeUserSessions(userId: string) {
     await this.redisService.del(`refresh_token:${userId}`);
 
-    const sessionKeys = await this.redisService.keys(`session:refresh:${userId}:*`);
+    const sessionKeys = await this.redisService.keys(
+      `session:refresh:${userId}:*`,
+    );
     if (sessionKeys.length) {
       for (const key of sessionKeys) {
         await this.redisService.del(key);
@@ -717,8 +1136,15 @@ export class AuthService {
   private async blacklistAccessToken(token: string) {
     try {
       const payload = this.jwtHelper.verifyAccessToken(token);
-      const ttl = Math.max((payload.exp ?? 0) - Math.floor(Date.now() / 1000), 1);
-      await this.redisService.set(`blacklist:access:${this.hashToken(token)}`, '1', ttl);
+      const ttl = Math.max(
+        (payload.exp ?? 0) - Math.floor(Date.now() / 1000),
+        1,
+      );
+      await this.redisService.set(
+        `blacklist:access:${this.hashToken(token)}`,
+        '1',
+        ttl,
+      );
     } catch {
       // Ignore invalid token blacklist attempts.
     }
@@ -773,8 +1199,122 @@ export class AuthService {
     return `session:refresh:${userId}:${refreshHash}`;
   }
 
-  private otpKey(channel: 'email' | 'phone', identifier: string, tenantId: string | null): string {
-    return `otp:${channel}:${tenantId ?? 'global'}:${identifier.toLowerCase()}`;
+  private otpKey(
+    purpose: OtpPurpose,
+    channel: OtpChannel,
+    identifier: string,
+    tenantId: string | null,
+  ): string {
+    return `otp:${purpose}:${channel}:${tenantId ?? 'global'}:${identifier.toLowerCase()}`;
+  }
+
+  private otpTokenKey(purpose: OtpPurpose, token: string): string {
+    return `otp:${purpose}:token:${token}`;
+  }
+
+  private otpResendKey(
+    purpose: OtpPurpose,
+    identifier: string,
+    tenantId: string | null,
+  ): string {
+    return `otp:${purpose}:resend:${tenantId ?? 'global'}:${identifier.toLowerCase()}`;
+  }
+
+  private otpInvalidAttemptKey(
+    purpose: OtpPurpose,
+    identifier: string,
+    tenantId: string | null,
+  ): string {
+    return `otp:${purpose}:invalid:${tenantId ?? 'global'}:${identifier.toLowerCase()}`;
+  }
+
+  private otpBlockKey(
+    purpose: OtpPurpose,
+    identifier: string,
+    tenantId: string | null,
+  ): string {
+    return `otp:${purpose}:blocked:${tenantId ?? 'global'}:${identifier.toLowerCase()}`;
+  }
+
+  private async assertOtpNotBlocked(
+    purpose: OtpPurpose,
+    identifier: string,
+    tenantId: string | null,
+  ): Promise<void> {
+    const blockKey = this.otpBlockKey(purpose, identifier, tenantId);
+    const isBlocked = await this.redisService.exists(blockKey);
+
+    if (!isBlocked) {
+      return;
+    }
+
+    throw new HttpException(
+      'Too many OTP attempts. OTP is blocked for 6 hours.',
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
+
+  private async bumpOtpResendCounter(
+    purpose: OtpPurpose,
+    identifier: string,
+    tenantId: string | null,
+    ttl: number,
+  ): Promise<void> {
+    const key = this.otpResendKey(purpose, identifier, tenantId);
+    const attempts = await this.redisService.incr(key);
+
+    if (attempts === 1) {
+      await this.redisService.expire(key, ttl);
+    }
+
+    if (attempts > OTP_MAX_RESEND_ATTEMPTS) {
+      await this.redisService.set(
+        this.otpBlockKey(purpose, identifier, tenantId),
+        'resend_limit',
+        OTP_BLOCK_SECONDS,
+      );
+      await this.redisService.del(key);
+
+      throw new HttpException(
+        'OTP resend limit exceeded. OTP is blocked for 6 hours.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private async bumpOtpInvalidAttempts(
+    purpose: OtpPurpose,
+    identifier: string,
+    tenantId: string | null,
+  ): Promise<void> {
+    const key = this.otpInvalidAttemptKey(purpose, identifier, tenantId);
+    const attempts = await this.redisService.incr(key);
+
+    if (attempts === 1) {
+      await this.redisService.expire(key, OTP_TTL_SECONDS);
+    }
+
+    if (attempts >= OTP_MAX_INVALID_ATTEMPTS) {
+      await this.redisService.set(
+        this.otpBlockKey(purpose, identifier, tenantId),
+        'invalid_attempt_limit',
+        OTP_BLOCK_SECONDS,
+      );
+      await this.redisService.del(key);
+    }
+  }
+
+  private async clearOtpGuardKeys(
+    purpose: OtpPurpose,
+    identifier: string,
+    tenantId: string | null,
+  ): Promise<void> {
+    await this.redisService.del(
+      this.otpResendKey(purpose, identifier, tenantId),
+    );
+    await this.redisService.del(
+      this.otpInvalidAttemptKey(purpose, identifier, tenantId),
+    );
   }
 
   private getRefreshTtlSeconds(): number {
@@ -782,10 +1322,13 @@ export class AuthService {
   }
 
   private slugify(value: string): string {
-    return value
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '') || `user${Math.floor(1000 + Math.random() * 9000)}`;
+    return (
+      value
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '') ||
+      `user${Math.floor(1000 + Math.random() * 9000)}`
+    );
   }
 }

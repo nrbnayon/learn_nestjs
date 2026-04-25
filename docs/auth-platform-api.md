@@ -47,6 +47,8 @@ Body parameters:
 - `username` string, optional. Auto-generated from `fullName` when omitted
 - `password` string, optional
 - `tenantId` string, optional
+- `otpVerification` boolean, optional. If `true`, registration uses OTP verification instead of email link
+- `verificationChannel` string, optional. One of `email` or `phone` (used with `otpVerification=true`)
 
 Example:
 ```json
@@ -56,7 +58,29 @@ Example:
   "phone": "+15551234567",
   "username": "john_doe",
   "password": "StrongPass123!",
-  "tenantId": "tenant-uuid"
+  "tenantId": "tenant-uuid",
+  "otpVerification": true,
+  "verificationChannel": "email"
+}
+```
+
+Registration response now returns verification instructions (not login tokens) until account verification is complete.
+
+Example success response:
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "message": "Account created successfully. Check john@example.com for a 6-digit OTP (valid for 5 minutes).",
+  "data": {
+    "verificationRequired": true,
+    "verificationType": "otp",
+    "channel": "email",
+    "identifier": "john@example.com",
+    "expiresIn": 300,
+    "verificationToken": "253b75f5f61244e1887f0a95d4115dc4"
+  },
+  "timestamp": "2026-04-25T08:24:46.795Z"
 }
 ```
 
@@ -150,6 +174,11 @@ Body:
 }
 ```
 
+Behavior:
+- Sends password-reset OTP to email (non-enumerable response)
+- Then call OTP verify with `purpose=password_reset`
+- Use the returned `resetToken` with `/auth/reset-password`
+
 ### Reset password
 ```http
 POST /auth/reset-password
@@ -158,7 +187,7 @@ POST /auth/reset-password
 Body:
 ```json
 {
-  "token": "reset-token-from-email",
+  "token": "reset-token-from-otp-verify",
   "newPassword": "NewPass123!"
 }
 ```
@@ -178,6 +207,86 @@ Redirect behavior:
 - `platform=web` (default): redirects to `WEB_VERIFY_EMAIL_SUCCESS_URL` or `WEB_VERIFY_EMAIL_FAILURE_URL`
 - `platform=app`: redirects to `APP_VERIFY_EMAIL_SUCCESS_URL` or `APP_VERIFY_EMAIL_FAILURE_URL`
 - Backend appends query params: `status`, `platform`, and on failure `message`
+
+### Frontend examples
+
+Web email link button:
+```tsx
+const apiBase = 'http://localhost:3001/api/v1';
+
+export function VerifyEmailButton({ token }: { token: string }) {
+  const verifyUrl = `${apiBase}/auth/verify-email?token=${encodeURIComponent(token)}&platform=web`;
+
+  return (
+    <a href={verifyUrl} target="_self" rel="noreferrer">
+      Verify your email
+    </a>
+  );
+}
+```
+
+Web success page:
+```tsx
+import { useSearchParams } from 'react-router-dom';
+
+export function VerifyEmailSuccessPage() {
+  const [searchParams] = useSearchParams();
+  const status = searchParams.get('status');
+  const message = searchParams.get('message');
+
+  return (
+    <div>
+      <h1>{status === 'success' ? 'Email verified' : 'Verification failed'}</h1>
+      {message ? <p>{message}</p> : null}
+      <a href="/login">Go to login</a>
+    </div>
+  );
+}
+```
+
+Mobile deeplink route handler with Expo Router:
+```tsx
+import { useLocalSearchParams, router } from 'expo-router';
+import { useEffect } from 'react';
+
+export default function VerifyEmailRoute() {
+  const { token, platform } = useLocalSearchParams<{ token?: string; platform?: string }>();
+
+  useEffect(() => {
+    const run = async () => {
+      if (!token) return;
+
+      const apiBase = 'http://localhost:3001/api/v1';
+      const url = `${apiBase}/auth/verify-email?token=${encodeURIComponent(token)}&platform=${platform === 'app' ? 'app' : 'web'}`;
+      const response = await fetch(url, { method: 'GET' });
+
+      if (response.redirected) {
+        router.replace(response.url);
+        return;
+      }
+
+      const text = await response.text();
+      console.log(text);
+    };
+
+    void run();
+  }, [platform, token]);
+
+  return null;
+}
+```
+
+Mobile app deep link setup example:
+```ts
+// app.json or app.config.ts
+{
+  "scheme": "nestjschat"
+}
+```
+
+Deep link target examples:
+- `nestjschat://auth/verify-email/success?status=success&platform=app`
+- `nestjschat://auth/verify-email/failure?status=failure&platform=app&message=Invalid%20verification%20token`
 
 API fallback:
 ```http
@@ -203,18 +312,28 @@ Body:
 {
   "identifier": "john@example.com",
   "channel": "email",
-  "tenantId": "tenant-uuid"
+  "tenantId": "tenant-uuid",
+  "purpose": "account_verification"
 }
 ```
 
 Rules:
 - `channel` must be `email` or `phone`
+- `purpose` supports `login`, `account_verification`, `password_reset` (default: `login`)
 - Phone OTP currently returns a dummy `123456`
-- Email OTP is stored in Redis with a 5 minute TTL
+- Email OTP is stored in Redis with a 5 minute TTL (`password_reset` uses 10 minutes)
+- Response includes `verificationToken` (optional but recommended for verify step)
+- Resend is limited to 3 requests per OTP window; exceeding this blocks OTP for 6 hours
+- Invalid OTP attempts are limited to 3; after that OTP is blocked for 6 hours
 
 ### Verify OTP
 ```http
 POST /auth/otp/verify
+```
+
+Alias:
+```http
+POST /auth/verify-otp
 ```
 
 Body:
@@ -222,9 +341,16 @@ Body:
 {
   "identifier": "john@example.com",
   "otp": "123456",
-  "tenantId": "tenant-uuid"
+  "tenantId": "tenant-uuid",
+  "purpose": "account_verification",
+  "token": "253b75f5f61244e1887f0a95d4115dc4"
 }
 ```
+
+Purpose-specific behavior:
+- `purpose=login`: returns `{ user, tokens }`
+- `purpose=account_verification`: marks email/phone as verified and returns success message
+- `purpose=password_reset`: returns `resetToken` (short-lived) for `/auth/reset-password`
 
 ## 5) Tenant endpoints
 

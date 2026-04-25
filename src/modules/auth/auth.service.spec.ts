@@ -31,6 +31,8 @@ describe('AuthService', () => {
   const redisMock = {
     setJson: jest.fn(),
     set: jest.fn(),
+    del: jest.fn(),
+    exists: jest.fn().mockResolvedValue(false),
     incr: jest.fn().mockResolvedValue(1),
     expire: jest.fn(),
   };
@@ -68,5 +70,19 @@ describe('AuthService', () => {
 
     expect(redisMock.setJson).toHaveBeenCalled();
     expect(mailMock.sendMail).toHaveBeenCalled();
+  });
+
+  it('blocks OTP resend after more than 3 attempts', async () => {
+    redisMock.incr.mockResolvedValueOnce(4);
+
+    await expect(
+      service.sendOtp({
+        identifier: 'user@example.com',
+        channel: 'email',
+        purpose: 'login',
+      }),
+    ).rejects.toThrow('OTP resend limit exceeded');
+
+    expect(redisMock.set).toHaveBeenCalled();
   });
 });

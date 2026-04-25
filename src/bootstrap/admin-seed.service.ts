@@ -15,21 +15,29 @@ export class AdminSeedService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const nodeEnv = this.configService.get<string>('app.nodeEnv', 'development');
+    const nodeEnv = this.configService.get<string>(
+      'app.nodeEnv',
+      'development',
+    );
     if (nodeEnv === 'production') {
       return;
     }
 
     const adminName = this.configService.get<string>('seed.adminName')?.trim();
-    const adminEmail = this.configService.get<string>('seed.adminEmail')?.trim().toLowerCase();
+    const adminEmail = this.configService
+      .get<string>('seed.adminEmail')
+      ?.trim()
+      .toLowerCase();
     const adminPassword = this.configService.get<string>('seed.adminPassword');
 
     if (!adminName || !adminEmail || !adminPassword) {
-      this.logger.debug('Admin seed skipped: ADMIN_NAME/ADMIN_EMAIL/ADMIN_PASSWORD not fully configured');
+      this.logger.debug(
+        'Admin seed skipped: ADMIN_NAME/ADMIN_EMAIL/ADMIN_PASSWORD not fully configured',
+      );
       return;
     }
 
-    const existing = await (this.prisma as any).user.findFirst({
+    const existing = await this.prisma.user.findFirst({
       where: {
         OR: [{ email: adminEmail }, { username: this.toUsername(adminName) }],
       },
@@ -37,13 +45,15 @@ export class AdminSeedService implements OnModuleInit {
     });
 
     if (existing) {
-      this.logger.log(`Admin seed skipped: user already exists (${existing.email ?? existing.username})`);
+      this.logger.log(
+        `Admin seed skipped: user already exists (${existing.email ?? existing.username})`,
+      );
       return;
     }
 
     const passwordHash = await bcrypt.hash(adminPassword, BCRYPT_ROUNDS);
 
-    await (this.prisma as any).user.create({
+    await this.prisma.user.create({
       data: {
         fullName: adminName,
         email: adminEmail,
@@ -63,7 +73,7 @@ export class AdminSeedService implements OnModuleInit {
     let index = 0;
 
     while (index < 20) {
-      const exists = await (this.prisma as any).user.findFirst({
+      const exists = await this.prisma.user.findFirst({
         where: { username: candidate },
         select: { id: true },
       });

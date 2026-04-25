@@ -45,17 +45,19 @@ import { AdminSeedService } from './bootstrap/admin-seed.service';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('jwt.secret'),
         signOptions: {
-          expiresIn: configService.get<string>('jwt.expiresIn', '7d') as any,
+          expiresIn: configService.get<string>('jwt.expiresIn', '7d'),
         },
       }),
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => [{
-        ttl: configService.get<number>('throttle.ttl', 60) * 1000,
-        limit: configService.get<number>('throttle.limit', 100),
-      }],
+      useFactory: (configService: ConfigService) => [
+        {
+          ttl: configService.get<number>('throttle.ttl', 60) * 1000,
+          limit: configService.get<number>('throttle.limit', 100),
+        },
+      ],
     }),
     CommonModule,
     PrismaModule,

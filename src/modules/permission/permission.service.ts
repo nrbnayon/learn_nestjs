@@ -6,11 +6,11 @@ export class PermissionService {
   constructor(private readonly prisma: PrismaService) {}
 
   create(data: { action: string; subject: string; description?: string }) {
-    return (this.prisma as any).permission.create({ data });
+    return this.prisma.permission.create({ data });
   }
 
   findAll() {
-    return (this.prisma as any).permission.findMany({
+    return this.prisma.permission.findMany({
       orderBy: [{ subject: 'asc' }, { action: 'asc' }],
     });
   }

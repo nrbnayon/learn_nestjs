@@ -21,13 +21,16 @@ export class QueueService {
 
   // ── Email Queue ───────────────────────────────────────────────────────────
 
-  async sendEmail(data: SendEmailJobData, delayMs = 0): Promise<void> {
+  sendEmail(data: SendEmailJobData, delayMs = 0): void {
     this.logger.debug(
       `Email job skipped (queue disabled in local mode): ${data.to} after ${delayMs}ms`,
     );
   }
 
-  async sendWelcomeEmail(user: { email: string; displayName: string }): Promise<void> {
+  async sendWelcomeEmail(user: {
+    email: string;
+    displayName: string;
+  }): Promise<void> {
     await this.sendEmail({
       to: user.email,
       subject: 'Welcome to NestJS Chat! 🎉',
@@ -71,17 +74,24 @@ export class QueueService {
 
   // ── Notification Queue ────────────────────────────────────────────────────
 
-  async sendNotification(data: SendNotificationJobData): Promise<void> {
-    this.logger.debug(`Notification job skipped (queue disabled in local mode): ${data.userId}`);
+  sendNotification(data: SendNotificationJobData): void {
+    this.logger.debug(
+      `Notification job skipped (queue disabled in local mode): ${data.userId}`,
+    );
   }
 
-  async sendBulkNotifications(notifications: SendNotificationJobData[]): Promise<void> {
-    this.logger.debug(`${notifications.length} notification jobs skipped in local mode`);
+  sendBulkNotifications(notifications: SendNotificationJobData[]): void {
+    this.logger.debug(
+      `${notifications.length} notification jobs skipped in local mode`,
+    );
   }
 
   // ── Queue Health ──────────────────────────────────────────────────────────
 
-  async getQueueStats(): Promise<Record<string, any>> {
+  getQueueStats(): Record<
+    string,
+    { queued: number; active: number; completed: number; failed: number }
+  > {
     return {
       email: { queued: 0, active: 0, completed: 0, failed: 0 },
       notification: { queued: 0, active: 0, completed: 0, failed: 0 },

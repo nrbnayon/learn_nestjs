@@ -1,4 +1,4 @@
-export interface SuccessResponse<T = any> {
+export interface SuccessResponse<T = unknown> {
   success: true;
   message: string;
   data: T;
@@ -29,19 +29,22 @@ export class ResponseUtil {
     };
   }
 
-  static created<T>(data: T, message = 'Created successfully'): SuccessResponse<T> {
+  static created<T>(
+    data: T,
+    message = 'Created successfully',
+  ): SuccessResponse<T> {
     return this.success(data, message, 201);
   }
 
   static noContent(message = 'Operation successful'): SuccessResponse<null> {
-    return this.success(null, message, 204);
+    return this.success<null>(null, message, 204);
   }
 
   static paginated<T>(
     data: T[],
-    meta: Record<string, any>,
+    meta: Record<string, unknown>,
     message = 'Success',
-  ): Record<string, any> {
+  ): Record<string, unknown> {
     return {
       success: true,
       message,

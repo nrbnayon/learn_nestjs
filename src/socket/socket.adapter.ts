@@ -55,7 +55,9 @@ export class SocketIoAdapter extends IoAdapter {
         });
 
         const hash = crypto.createHash('sha256').update(token).digest('hex');
-        const isBlacklisted = await redisService.exists(`blacklist:access:${hash}`);
+        const isBlacklisted = await redisService.exists(
+          `blacklist:access:${hash}`,
+        );
         if (isBlacklisted) {
           return next(new Error('Token has been revoked'));
         }

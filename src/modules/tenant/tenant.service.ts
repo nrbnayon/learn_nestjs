@@ -6,16 +6,16 @@ export class TenantService {
   constructor(private readonly prisma: PrismaService) {}
 
   create(data: { name: string; domain?: string }) {
-    return (this.prisma as any).tenant.create({ data });
+    return this.prisma.tenant.create({ data });
   }
 
   findAll() {
-    return (this.prisma as any).tenant.findMany({
+    return this.prisma.tenant.findMany({
       orderBy: { createdAt: 'desc' },
     });
   }
 
   resolveByDomain(domain: string) {
-    return (this.prisma as any).tenant.findFirst({ where: { domain } });
+    return this.prisma.tenant.findFirst({ where: { domain } });
   }
 }

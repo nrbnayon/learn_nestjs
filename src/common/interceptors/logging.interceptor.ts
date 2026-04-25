@@ -12,7 +12,7 @@ import { Request, Response } from 'express';
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const ctx = context.switchToHttp();
     const request = ctx.getRequest<Request>();
     const response = ctx.getResponse<Response>();
@@ -29,10 +29,11 @@ export class LoggingInterceptor implements NestInterceptor {
             `${method} ${originalUrl} ${statusCode} ${duration}ms — ${ip} "${userAgent}"`,
           );
         },
-        error: (err) => {
+        error: (err: unknown) => {
           const duration = Date.now() - startTime;
+          const message = err instanceof Error ? err.message : 'Unknown error';
           this.logger.error(
-            `${method} ${originalUrl} ERROR ${duration}ms — ${err.message}`,
+            `${method} ${originalUrl} ERROR ${duration}ms — ${message}`,
           );
         },
       }),
