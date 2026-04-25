@@ -155,10 +155,14 @@ export class AuthService {
         ctx,
       );
 
-      if ('verificationToken' in otpResult) {
-        verificationToken = otpResult.verificationToken;
-      }
-      verificationExpiresIn = otpResult.expiresIn;
+      verificationToken =
+        otpResult.data && typeof otpResult.data === 'object'
+          ? (otpResult.data as { verificationToken?: string }).verificationToken
+          : undefined;
+      verificationExpiresIn =
+        otpResult.data && typeof otpResult.data === 'object'
+          ? (otpResult.data as { expiresIn?: number }).expiresIn
+          : undefined;
     }
 
     await this.audit(
@@ -257,27 +261,38 @@ export class AuthService {
   }
 
   async sendOtp(dto: OtpSendDto, ctx: AuthContext = {}) {
-    const purpose: OtpPurpose = dto.purpose ?? 'login';
+    const identifier = dto.identifier.trim();
+    const userAnyTenant =
+      await this.findUserByIdentifierAcrossTenants(identifier);
+    const purpose: OtpPurpose = this.resolveOtpPurpose(
+      dto.purpose,
+      userAnyTenant,
+    );
     const tenantId = await this.resolveTenantId(
-      dto.tenantId ?? ctx.tenantId,
+      dto.tenantId ?? ctx.tenantId ?? userAnyTenant?.tenantId ?? undefined,
       ctx.tenantDomain,
     );
-    const identifier = dto.identifier.trim();
+    const user = await this.findUserByIdentifier(identifier, tenantId);
+    const channel: OtpChannel = this.resolveOtpChannel(
+      dto.channel,
+      identifier,
+      user,
+    );
+
     await this.assertOtpNotBlocked(purpose, identifier, tenantId);
     const otp =
-      dto.channel === 'phone' ? '123456' : this.jwtHelper.generateOtpCode(6);
-    const user = await this.findUserByIdentifier(identifier, tenantId);
+      channel === 'phone' ? '123456' : this.jwtHelper.generateOtpCode(6);
 
     if (purpose === 'account_verification') {
       if (!user) {
         throw new NotFoundException('User not found for OTP identifier');
       }
 
-      if (dto.channel === 'email' && user.isEmailVerified) {
+      if (channel === 'email' && user.isEmailVerified) {
         throw new BadRequestException('Email is already verified');
       }
 
-      if (dto.channel === 'phone' && user.isPhoneVerified) {
+      if (channel === 'phone' && user.isPhoneVerified) {
         throw new BadRequestException('Phone is already verified');
       }
     }
@@ -285,17 +300,20 @@ export class AuthService {
     if (purpose === 'password_reset' && !user) {
       // Keep password reset behavior non-enumerable.
       return {
-        success: true,
-        channel: dto.channel,
-        purpose,
-        expiresIn: PASSWORD_RESET_OTP_TTL_SECONDS,
+        message:
+          'If the account exists, a password reset OTP has been sent successfully.',
+        data: {
+          channel,
+          purpose,
+          expiresIn: PASSWORD_RESET_OTP_TTL_SECONDS,
+        },
       };
     }
 
     const verificationToken = this.jwtHelper.generateSecureToken();
     const payload: OtpPayload = {
       identifier,
-      channel: dto.channel,
+      channel,
       code: otp,
       purpose,
       tenantId,
@@ -311,7 +329,7 @@ export class AuthService {
     await this.bumpOtpResendCounter(purpose, identifier, tenantId, ttl);
 
     await this.redisService.setJson(
-      this.otpKey(purpose, dto.channel, identifier, tenantId),
+      this.otpKey(purpose, channel, identifier, tenantId),
       payload,
       ttl,
     );
@@ -322,7 +340,7 @@ export class AuthService {
       ttl,
     );
 
-    if (dto.channel === 'email') {
+    if (channel === 'email') {
       const purposeLabel =
         purpose === 'account_verification'
           ? 'account verification'
@@ -350,12 +368,14 @@ export class AuthService {
     }
 
     return {
-      success: true,
-      channel: dto.channel,
-      purpose,
-      expiresIn: ttl,
-      verificationToken,
-      ...(dto.channel === 'phone' ? { otp } : {}),
+      message: `OTP sent successfully via ${channel}.`,
+      data: {
+        channel,
+        purpose,
+        expiresIn: ttl,
+        verificationToken,
+        ...(channel === 'phone' ? { otp } : {}),
+      },
     };
   }
 
@@ -1031,6 +1051,96 @@ export class AuthService {
     }
 
     return undefined;
+  }
+
+  private resolveOtpChannel(
+    preferredChannel: OtpChannel | undefined,
+    identifier: string,
+    user: {
+      email?: string | null;
+      phone?: string | null;
+    } | null,
+  ): OtpChannel {
+    if (preferredChannel) {
+      return preferredChannel;
+    }
+
+    const normalized = identifier.trim();
+    const normalizedLower = normalized.toLowerCase();
+
+    if (normalized.includes('@')) {
+      return 'email';
+    }
+
+    if (/^\+?\d{6,20}$/.test(normalized)) {
+      return 'phone';
+    }
+
+    if (user?.email?.toLowerCase() === normalizedLower) {
+      return 'email';
+    }
+
+    if (user?.phone === normalized) {
+      return 'phone';
+    }
+
+    if (user?.email) {
+      return 'email';
+    }
+
+    if (user?.phone) {
+      return 'phone';
+    }
+
+    throw new BadRequestException(
+      'Unable to auto-detect OTP channel. Provide channel=email or channel=phone.',
+    );
+  }
+
+  private resolveOtpPurpose(
+    requestedPurpose: OtpPurpose | undefined,
+    user: {
+      status?: string;
+      isEmailVerified?: boolean;
+      isPhoneVerified?: boolean;
+    } | null,
+  ): OtpPurpose {
+    if (requestedPurpose) {
+      return requestedPurpose;
+    }
+
+    if (
+      user?.status === 'PENDING_VERIFICATION' &&
+      !user.isEmailVerified &&
+      !user.isPhoneVerified
+    ) {
+      return 'account_verification';
+    }
+
+    return 'login';
+  }
+
+  private findUserByIdentifierAcrossTenants(identifier: string) {
+    const normalized = identifier.trim();
+
+    return this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: normalized.toLowerCase() },
+          { username: normalized.toLowerCase() },
+          { phone: normalized },
+        ],
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        status: true,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+        email: true,
+        phone: true,
+      },
+    });
   }
 
   private buildRegisterSuccessMessage(params: {

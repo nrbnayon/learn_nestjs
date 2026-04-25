@@ -107,10 +107,16 @@ export class OtpSendDto {
   @Transform(({ value }) => value?.trim())
   identifier: string;
 
-  @ApiProperty({ example: 'email', enum: ['email', 'phone'] })
-  @IsString()
+  @ApiProperty({
+    example: 'email',
+    enum: ['email', 'phone'],
+    required: false,
+    description:
+      'Optional. If omitted, backend auto-detects channel from identifier/account',
+  })
+  @IsOptional()
   @IsIn(['email', 'phone'])
-  channel: 'email' | 'phone';
+  channel?: 'email' | 'phone';
 
   @ApiProperty({ example: 'tenant-01', required: false })
   @IsOptional()

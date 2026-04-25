@@ -45,7 +45,10 @@ import { AdminSeedService } from './bootstrap/admin-seed.service';
       useFactory: (configService: ConfigService): JwtModuleOptions => ({
         secret: configService.get<string>('jwt.secret'),
         signOptions: {
-          expiresIn: configService.get<string>('jwt.expiresIn', '7d') as JwtModuleOptions['signOptions']['expiresIn'],
+          expiresIn: configService.get<string>(
+            'jwt.expiresIn',
+            '7d',
+          ) as JwtModuleOptions['signOptions']['expiresIn'],
         },
       }),
     }),

@@ -77,11 +77,12 @@ export class AuthController {
   @Post('otp/send')
   sendOtp(
     @Body() dto: OtpSendDto,
+    @Headers('x-tenant-id') tenantId?: string,
     @Headers('x-tenant-domain') tenantDomain?: string,
   ) {
     return this.authService.sendOtp(dto, {
       tenantDomain,
-      tenantId: dto.tenantId,
+      tenantId: dto.tenantId ?? tenantId,
     });
   }
 

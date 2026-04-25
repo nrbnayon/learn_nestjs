@@ -21,7 +21,10 @@ export class EmailProcessor extends WorkerHost {
         to: job.data.to,
         subject: job.data.subject,
         template: job.data.template,
-        context: job.data.context as Record<string, string | number | undefined>,
+        context: job.data.context as Record<
+          string,
+          string | number | undefined
+        >,
       });
       this.logger.log(`✅ Email sent to ${job.data.to}`);
     } catch (error) {

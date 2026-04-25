@@ -317,14 +317,45 @@ Body:
 }
 ```
 
+Minimal request (recommended):
+```json
+{
+  "identifier": "john@example.com"
+}
+```
+
 Rules:
-- `channel` must be `email` or `phone`
-- `purpose` supports `login`, `account_verification`, `password_reset` (default: `login`)
+- `identifier` is required
+- `channel` is optional. Backend auto-detects from identifier/account:
+  - email-like identifier (`user@example.com`) -> `email`
+  - phone-like identifier (`+15551234567`) -> `phone`
+  - username -> backend chooses available contact channel from account
+- `tenantId` is optional. Backend resolves from `x-tenant-id`, `x-tenant-domain`, or matched account tenant when possible
+- `purpose` is optional. Backend auto-detects:
+  - pending unverified account -> `account_verification`
+  - otherwise -> `login`
+  - `forgot-password` flow still uses `password_reset` internally
 - Phone OTP currently returns a dummy `123456`
 - Email OTP is stored in Redis with a 5 minute TTL (`password_reset` uses 10 minutes)
-- Response includes `verificationToken` (optional but recommended for verify step)
+- Response includes `verificationToken` (recommended for verify step)
 - Resend is limited to 3 requests per OTP window; exceeding this blocks OTP for 6 hours
 - Invalid OTP attempts are limited to 3; after that OTP is blocked for 6 hours
+
+Example success response:
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "message": "OTP sent successfully via email.",
+  "data": {
+    "channel": "email",
+    "purpose": "account_verification",
+    "expiresIn": 300,
+    "verificationToken": "1996a96d56e64214b948c181f8100689"
+  },
+  "timestamp": "2026-04-25T08:24:46.795Z"
+}
+```
 
 ### Verify OTP
 ```http
