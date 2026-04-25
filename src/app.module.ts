@@ -30,6 +30,7 @@ import { PermissionModule } from './modules/permission/permission.module';
 import { SessionModule } from './modules/session/session.module';
 import { OauthModule } from './modules/oauth/oauth.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { AdminSeedService } from './bootstrap/admin-seed.service';
 
 @Module({
   imports: [
@@ -79,6 +80,6 @@ import { AuditModule } from './modules/audit/audit.module';
     AuditModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, AdminSeedService],
 })
 export class AppModule {}

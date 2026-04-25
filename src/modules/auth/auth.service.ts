@@ -40,6 +40,9 @@ interface AuthContext {
   accessToken?: string;
 }
 
+type VerifyPlatform = 'web' | 'app';
+type VerifyResult = 'success' | 'failure';
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -346,6 +349,33 @@ export class AuthService {
 
   async getMe(userId: string) {
     return this.getSafeUserById(userId);
+  }
+
+  getVerifyEmailRedirectUrl(
+    platform: VerifyPlatform,
+    result: VerifyResult,
+  ): string {
+    if (platform === 'app') {
+      return result === 'success'
+        ? this.configService.get<string>(
+            'app.appVerifyEmailSuccessUrl',
+            'nestjschat://auth/verify-email/success',
+          )
+        : this.configService.get<string>(
+            'app.appVerifyEmailFailureUrl',
+            'nestjschat://auth/verify-email/failure',
+          );
+    }
+
+    return result === 'success'
+      ? this.configService.get<string>(
+          'app.webVerifyEmailSuccessUrl',
+          'http://localhost:5173/auth/verify-email/success',
+        )
+      : this.configService.get<string>(
+          'app.webVerifyEmailFailureUrl',
+          'http://localhost:5173/auth/verify-email/failure',
+        );
   }
 
   private async issueTokens(userId: string, tenantId: string | null, ctx: AuthContext): Promise<TokenPair> {

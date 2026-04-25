@@ -1,6 +1,17 @@
-import { Body, Controller, Get, Headers, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+	BadRequestException,
+	Body,
+	Controller,
+	Get,
+	Headers,
+	Post,
+	Query,
+	Req,
+	Res,
+	UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { FastifyRequest } from 'fastify';
+import { FastifyReply, FastifyRequest } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/roles.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
@@ -96,8 +107,36 @@ export class AuthController {
 
 	@Public()
 	@Get('verify-email')
-	verifyEmailFromLink(@Query('token') token: string) {
-		return this.authService.verifyEmail({ token });
+	async verifyEmailFromLink(
+		@Query('token') token: string,
+		@Query('platform') platform?: 'web' | 'app',
+		@Res() reply?: FastifyReply,
+	) {
+		if (!token) {
+			throw new BadRequestException('token is required');
+		}
+
+		const resolvedPlatform: 'web' | 'app' = platform === 'app' ? 'app' : 'web';
+
+		try {
+			await this.authService.verifyEmail({ token });
+			const redirectUrl = new URL(
+				this.authService.getVerifyEmailRedirectUrl(resolvedPlatform, 'success'),
+			);
+			redirectUrl.searchParams.set('status', 'success');
+			redirectUrl.searchParams.set('platform', resolvedPlatform);
+			return reply?.redirect(redirectUrl.toString());
+		} catch (error) {
+			const redirectUrl = new URL(
+				this.authService.getVerifyEmailRedirectUrl(resolvedPlatform, 'failure'),
+			);
+			redirectUrl.searchParams.set('status', 'failure');
+			redirectUrl.searchParams.set('platform', resolvedPlatform);
+			if (error instanceof Error) {
+				redirectUrl.searchParams.set('message', error.message);
+			}
+			return reply?.redirect(redirectUrl.toString());
+		}
 	}
 
 	@Public()

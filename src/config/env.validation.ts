@@ -10,6 +10,10 @@ export const envValidationSchema = Joi.object({
   APP_HOST: Joi.string().default('127.0.0.1'),
   API_PREFIX: Joi.string().default('api/v1'),
   APP_BASE_URL: Joi.string().uri().default('http://localhost:3001'),
+  WEB_VERIFY_EMAIL_SUCCESS_URL: Joi.string().optional(),
+  WEB_VERIFY_EMAIL_FAILURE_URL: Joi.string().optional(),
+  APP_VERIFY_EMAIL_SUCCESS_URL: Joi.string().optional(),
+  APP_VERIFY_EMAIL_FAILURE_URL: Joi.string().optional(),
 
   // Database
   DATABASE_URL: Joi.string().required(),
@@ -63,4 +67,9 @@ export const envValidationSchema = Joi.object({
 
   // Socket
   SOCKET_CORS_ORIGIN: Joi.string().default('http://localhost:5173'),
+
+  // Seed admin
+  ADMIN_NAME: Joi.string().optional(),
+  ADMIN_EMAIL: Joi.string().email().optional(),
+  ADMIN_PASSWORD: Joi.string().min(8).optional(),
 });

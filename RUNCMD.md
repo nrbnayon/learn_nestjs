@@ -4,6 +4,7 @@
 
 ```powershell
 npm run start:dev
+npx prisma studio
 ```
 
 ### **Option 1: Docker Compose (Recommended) ⭐**

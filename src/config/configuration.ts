@@ -6,6 +6,18 @@ export default () => ({
     host: process.env.APP_HOST || '127.0.0.1',
     apiPrefix: process.env.API_PREFIX || 'api/v1',
     baseUrl: process.env.APP_BASE_URL || 'http://localhost:3001',
+    webVerifyEmailSuccessUrl:
+      process.env.WEB_VERIFY_EMAIL_SUCCESS_URL ||
+      'http://localhost:5173/auth/verify-email/success',
+    webVerifyEmailFailureUrl:
+      process.env.WEB_VERIFY_EMAIL_FAILURE_URL ||
+      'http://localhost:5173/auth/verify-email/failure',
+    appVerifyEmailSuccessUrl:
+      process.env.APP_VERIFY_EMAIL_SUCCESS_URL ||
+      'nestjschat://auth/verify-email/success',
+    appVerifyEmailFailureUrl:
+      process.env.APP_VERIFY_EMAIL_FAILURE_URL ||
+      'nestjschat://auth/verify-email/failure',
   },
   database: {
     url: process.env.DATABASE_URL,
@@ -63,5 +75,10 @@ export default () => ({
   },
   socket: {
     corsOrigin: process.env.SOCKET_CORS_ORIGIN || 'http://localhost:5173',
+  },
+  seed: {
+    adminName: process.env.ADMIN_NAME,
+    adminEmail: process.env.ADMIN_EMAIL,
+    adminPassword: process.env.ADMIN_PASSWORD,
   },
 });

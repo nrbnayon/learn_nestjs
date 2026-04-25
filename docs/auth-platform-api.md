@@ -169,6 +169,16 @@ Browser-friendly link:
 GET /auth/verify-email?token=email-verification-token
 ```
 
+Deep-linking to app after verify:
+```http
+GET /auth/verify-email?token=email-verification-token&platform=app
+```
+
+Redirect behavior:
+- `platform=web` (default): redirects to `WEB_VERIFY_EMAIL_SUCCESS_URL` or `WEB_VERIFY_EMAIL_FAILURE_URL`
+- `platform=app`: redirects to `APP_VERIFY_EMAIL_SUCCESS_URL` or `APP_VERIFY_EMAIL_FAILURE_URL`
+- Backend appends query params: `status`, `platform`, and on failure `message`
+
 API fallback:
 ```http
 POST /auth/verify-email
