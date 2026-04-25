@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 export interface JwtPayload {
   sub: string;
   tenantId?: string;
+  user_role?: string;
   roles: string[];
   permissions: string[];
   iat?: number;
@@ -15,6 +16,7 @@ export interface JwtPayload {
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
+  user_role: string;
 }
 
 @Injectable()
@@ -49,6 +51,7 @@ export class JwtHelperService {
     return {
       accessToken: this.generateAccessToken(payload),
       refreshToken: this.generateRefreshToken(payload),
+      user_role: payload.user_role ?? 'USER',
     };
   }
 

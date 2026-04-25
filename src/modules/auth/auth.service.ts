@@ -661,11 +661,13 @@ export class AuthService {
     tenantId: string | null,
     ctx: AuthContext,
   ): Promise<TokenPair> {
-    const { roles, permissions } = await this.buildAuthorizationClaims(userId);
+    const { user_role, roles, permissions } =
+      await this.buildAuthorizationClaims(userId);
 
     const tokens = this.jwtHelper.generateTokenPair({
       sub: userId,
       tenantId: tenantId ?? undefined,
+      user_role,
       roles,
       permissions,
     });
@@ -696,7 +698,7 @@ export class AuthService {
 
   private async buildAuthorizationClaims(
     userId: string,
-  ): Promise<{ roles: string[]; permissions: string[] }> {
+  ): Promise<{ user_role: string; roles: string[]; permissions: string[] }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -752,6 +754,7 @@ export class AuthService {
     }
 
     return {
+      user_role: user?.role ?? 'USER',
       roles: [...roleSet],
       permissions: [...permissionSet],
     };
