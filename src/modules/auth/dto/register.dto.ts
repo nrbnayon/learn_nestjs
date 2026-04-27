@@ -98,6 +98,16 @@ export class ForgotPasswordDto {
   @IsNotEmpty()
   @Transform(({ value }) => value?.toLowerCase().trim())
   email: string;
+
+  @ApiProperty({
+    example: true,
+    required: false,
+    description:
+      'When true, password reset is done with OTP instead of email link',
+  })
+  @IsOptional()
+  @IsBoolean()
+  otpVerification?: boolean;
 }
 
 export class OtpSendDto {

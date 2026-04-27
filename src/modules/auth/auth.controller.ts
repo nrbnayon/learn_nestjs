@@ -27,6 +27,7 @@ import {
   VerifyEmailDto,
 } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -36,6 +37,7 @@ export class AuthController {
   @Public()
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
+  @ResponseMessage('Registration successful. Please verify your account.')
   register(
     @Body() dto: RegisterDto,
     @Headers('x-tenant-id') tenantId?: string,
@@ -56,6 +58,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @ApiOperation({ summary: 'Unified login (password, OTP, OAuth account)' })
+  @ResponseMessage('Login successful')
   login(
     @Body() dto: LoginDto,
     @Headers('x-tenant-id') tenantId?: string,
@@ -105,25 +108,8 @@ export class AuthController {
   }
 
   @Public()
-  @Post('verify-otp')
-  verifyOtpAlias(
-    @Body() dto: OtpVerifyDto,
-    @Headers('x-tenant-domain') tenantDomain?: string,
-    @Req() req?: FastifyRequest,
-  ) {
-    return this.authService.verifyOtp(dto, {
-      tenantDomain,
-      tenantId: dto.tenantId,
-      ipAddress: req?.ip,
-      userAgent:
-        typeof req?.headers['user-agent'] === 'string'
-          ? req.headers['user-agent']
-          : undefined,
-    });
-  }
-
-  @Public()
   @Post('refresh-token')
+  @ResponseMessage('Tokens refreshed successfully')
   refreshToken(
     @Body() dto: RefreshTokenDto,
     @Headers('x-tenant-id') tenantId?: string,
@@ -196,18 +182,21 @@ export class AuthController {
 
   @Public()
   @Post('verify-email')
+  @ResponseMessage('Email verified successfully')
   verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.authService.verifyEmail(dto);
   }
 
   @Public()
   @Post('forgot-password')
+  @ResponseMessage('If the account exists, a password reset link has been sent')
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
   }
 
   @Public()
   @Post('reset-password')
+  @ResponseMessage('Password reset successfully')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
@@ -240,6 +229,7 @@ export class AuthController {
   @UseGuards(AuthGuard)
   @ApiBearerAuth()
   @Post('change-password')
+  @ResponseMessage('Password changed successfully')
   changePassword(
     @CurrentUser('id') userId: string,
     @Body() dto: ChangePasswordDto,

@@ -559,21 +559,47 @@ export class AuthService {
     });
   }
 
-  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
     const user = await this.prisma.user.findFirst({
       where: { email: dto.email.toLowerCase() },
     });
 
     if (!user) {
-      return;
+      return { message: `No account found with the email ${dto.email}` };
     }
 
-    await this.sendOtp({
-      identifier: dto.email,
-      channel: 'email',
-      tenantId: user.tenantId ?? undefined,
-      purpose: 'password_reset',
-    });
+    const shouldUseOtp = Boolean(dto.otpVerification);
+
+    if (shouldUseOtp) {
+      await this.sendOtp({
+        identifier: dto.email,
+        channel: 'email',
+        tenantId: user.tenantId ?? undefined,
+        purpose: 'password_reset',
+      });
+      return { message: `A 6-digit OTP has been sent to ${user.email}` };
+    } else {
+      const resetToken = this.jwtHelper.generateSecureToken();
+      const resetExpires = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordResetToken: resetToken,
+          passwordResetExpires: resetExpires,
+        },
+      });
+
+      await this.sendPasswordResetEmail(
+        user.email,
+        user.fullName,
+        resetToken,
+        'web',
+      );
+      return {
+        message: `A password reset link has been sent to ${user.email}`,
+      };
+    }
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
@@ -1217,7 +1243,47 @@ export class AuthService {
     await this.mailService.sendMail({
       to: email,
       subject: 'Verify your email',
-      html: `<p>Hello ${fullName}, verify here: ${verificationUrl}</p>`,
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111;max-width:600px;margin:0 auto;">
+          <h2 style="margin-bottom:12px;">Email Verification</h2>
+          <p>Hello ${fullName},</p>
+          <p>Click the button below to verify your email address:</p>
+          <div style="margin:24px 0;">
+            <a href="${verificationUrl}" style="background-color:#000;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:700;">Verify Email</a>
+          </div>
+          <p>If you did not request this, please ignore this email.</p>
+        </div>
+      `,
+    });
+  }
+
+  private async sendPasswordResetEmail(
+    email: string,
+    fullName: string,
+    token: string,
+    platform: VerifyPlatform = 'web',
+  ) {
+    const baseUrl = this.configService.get<string>(
+      'app.webUrl',
+      'http://localhost:5173',
+    );
+    const resetUrl = `${baseUrl}/auth/reset-password?token=${token}&platform=${platform}`;
+
+    await this.mailService.sendMail({
+      to: email,
+      subject: 'Reset your password',
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111;max-width:600px;margin:0 auto;">
+          <h2 style="margin-bottom:12px;">Password Reset Request</h2>
+          <p>Hello ${fullName},</p>
+          <p>We received a request to reset your password. Click the button below to set a new password:</p>
+          <div style="margin:24px 0;">
+            <a href="${resetUrl}" style="background-color:#000;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:700;">Reset Password</a>
+          </div>
+          <p>If you did not request this, please ignore this email.</p>
+          <p>This link expires in 10 minutes.</p>
+        </div>
+      `,
     });
   }
 

@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import {
   FastifyAdapter,
@@ -24,6 +24,7 @@ async function bootstrap() {
   );
 
   const configService = app.get(ConfigService);
+  const reflector = app.get(Reflector);
   const port = configService.get<number>('app.port', 3000);
   const host = configService.get<string>('app.host', '127.0.0.1');
   const apiPrefix = configService.get<string>('app.apiPrefix', 'api/v1');
@@ -45,7 +46,7 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(
     new LoggingInterceptor(),
-    new TransformInterceptor(),
+    new TransformInterceptor(reflector),
   );
   app.useWebSocketAdapter(new SocketIoAdapter(app, configService));
 
