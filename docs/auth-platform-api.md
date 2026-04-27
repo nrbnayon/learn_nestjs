@@ -136,9 +136,21 @@ Body:
 ### Logout
 ```http
 POST /auth/logout
+Authorization: Bearer <accessToken>
 ```
 
 Protected with Bearer token.
+
+Example success response:
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Logged out successfully. Your session has been terminated.",
+  "data": null,
+  "timestamp": "2026-04-27T08:24:44.227Z"
+}
+```
 
 ### Me
 ```http

@@ -211,6 +211,7 @@ export class AuthController {
   @UseGuards(AuthGuard)
   @ApiBearerAuth()
   @Post('logout')
+  @ResponseMessage('Logged out successfully. Your session has been terminated.')
   logout(@CurrentUser('id') userId: string, @Req() req?: FastifyRequest) {
     const authHeader = req?.headers?.authorization;
     const accessToken = authHeader?.startsWith('Bearer ')
