@@ -335,7 +335,7 @@ export class AuthService {
     );
 
     await this.redisService.setJson(
-      this.otpTokenKey(purpose, verificationToken),
+      this.otpTokenKey(verificationToken),
       payload,
       ttl,
     );
@@ -1196,7 +1196,7 @@ export class AuthService {
   }): Promise<OtpPayload | null> {
     if (params.token) {
       const byToken = await this.redisService.getJson<OtpPayload>(
-        this.otpTokenKey(params.purpose, params.token),
+        this.otpTokenKey(params.token),
       );
 
       if (
@@ -1226,9 +1226,7 @@ export class AuthService {
         payload.tenantId,
       ),
     );
-    await this.redisService.del(
-      this.otpTokenKey(payload.purpose, payload.token),
-    );
+    await this.redisService.del(this.otpTokenKey(payload.token));
   }
 
   private async sendEmailVerification(
@@ -1385,8 +1383,8 @@ export class AuthService {
     return `otp:${purpose}:${channel}:${tenantId ?? 'global'}:${identifier.toLowerCase()}`;
   }
 
-  private otpTokenKey(purpose: OtpPurpose, token: string): string {
-    return `otp:${purpose}:token:${token}`;
+  private otpTokenKey(token: string): string {
+    return `otp:token:${token}`;
   }
 
   private otpResendKey(

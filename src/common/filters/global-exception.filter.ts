@@ -101,7 +101,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     if (process.env.NODE_ENV !== 'production' && exception instanceof Error) {
-      responseBody.stack = exception.stack;
+      responseBody.developer = {
+        message: 'Oops! The server took a little tumble... 🪜',
+        hint: 'Check the file path below to see where the magic (or mistake) happened! ✨',
+        error: exception.message,
+        stack: exception.stack,
+      };
     }
 
     this.logger.warn(
