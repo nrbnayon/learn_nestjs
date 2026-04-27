@@ -5,6 +5,7 @@ coverage
 .DS_Store
 uploads
 *.log
+client_secret_*.json
 
 # Prisma
 prisma/dev.db

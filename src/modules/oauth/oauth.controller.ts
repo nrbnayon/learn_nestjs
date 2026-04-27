@@ -1,5 +1,8 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ResponseMessage } from '../../common/decorators/response-message.decorator';
+import { AuthGuard } from '../../common/guards/auth.guard';
 import { OauthService } from './oauth.service';
 
 @ApiTags('oauth')
@@ -7,17 +10,36 @@ import { OauthService } from './oauth.service';
 export class OauthController {
   constructor(private readonly oauthService: OauthService) {}
 
-  @Post('connect')
-  connectProvider(
+  @Post('google')
+  @ResponseMessage('Google login successful')
+  loginWithGoogle(
     @Body()
     dto: {
-      userId: string;
-      provider: 'google' | 'github' | 'facebook' | 'linkedin';
-      providerAccountId: string;
+      idToken: string;
+      tenantId?: string;
+      tenantDomain?: string;
       accessToken?: string;
       refreshToken?: string;
     },
   ) {
-    return this.oauthService.connectProvider(dto);
+    return this.oauthService.loginWithGoogle(dto);
+  }
+
+  @Post('connect')
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ResponseMessage('Provider account connected successfully')
+  connectProvider(
+    @CurrentUser('id') userId: string,
+    @Body()
+    dto: {
+      provider: 'google' | 'github' | 'facebook' | 'linkedin';
+      providerAccountId?: string;
+      idToken?: string;
+      accessToken?: string;
+      refreshToken?: string;
+    },
+  ) {
+    return this.oauthService.connectProvider(userId, dto);
   }
 }

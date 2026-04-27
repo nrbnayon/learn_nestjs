@@ -76,6 +76,9 @@ export default () => ({
   socket: {
     corsOrigin: process.env.SOCKET_CORS_ORIGIN || 'http://localhost:5173',
   },
+  oauth: {
+    googleClientId: process.env.GOOGLE_CLIENT_ID,
+  },
   seed: {
     adminName: process.env.ADMIN_NAME,
     adminEmail: process.env.ADMIN_EMAIL,

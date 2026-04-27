@@ -140,6 +140,7 @@ export class AuthService {
 
     let verificationToken: string | undefined;
     let verificationExpiresIn: number | undefined;
+    let verificationOtp: string | undefined;
 
     if (shouldUseOtpVerification && resolvedVerificationChannel) {
       const otpResult = await this.sendOtp(
@@ -162,6 +163,10 @@ export class AuthService {
       verificationExpiresIn =
         otpResult.data && typeof otpResult.data === 'object'
           ? (otpResult.data as { expiresIn?: number }).expiresIn
+          : undefined;
+      verificationOtp =
+        otpResult.data && typeof otpResult.data === 'object'
+          ? (otpResult.data as { otp?: string }).otp
           : undefined;
     }
 
@@ -199,6 +204,7 @@ export class AuthService {
               : user.email,
         expiresIn: verificationExpiresIn,
         verificationToken,
+        otp: verificationOtp,
       },
     };
   }
@@ -280,8 +286,7 @@ export class AuthService {
     );
 
     await this.assertOtpNotBlocked(purpose, identifier, tenantId);
-    const otp =
-      channel === 'phone' ? '123456' : this.jwtHelper.generateOtpCode(6);
+    const otp = this.jwtHelper.generateOtpCode(6);
 
     if (purpose === 'account_verification') {
       if (!user) {
@@ -361,6 +366,29 @@ export class AuthService {
             <p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:12px 0;">${otp}</p>
             <p>This code expires in <strong>${Math.floor(ttl / 60)} minutes</strong>.</p>
             <p>You can request a new code up to <strong>${OTP_MAX_RESEND_ATTEMPTS} times</strong>. If you exceed the limit or enter the wrong code ${OTP_MAX_INVALID_ATTEMPTS} times, OTP verification will be blocked for 6 hours.</p>
+            <p>If you did not request this, please ignore this email.</p>
+          </div>
+        `,
+      });
+    }
+
+    if (channel === 'phone' && user?.email) {
+      const purposeLabel =
+        purpose === 'account_verification'
+          ? 'account verification'
+          : purpose === 'password_reset'
+            ? 'password reset'
+            : 'login';
+
+      await this.mailService.sendMail({
+        to: user.email,
+        subject: 'Your OTP Code (Phone fallback copy)',
+        html: `
+          <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111;max-width:600px;margin:0 auto;">
+            <h2 style="margin-bottom:12px;">One-time verification code</h2>
+            <p>You requested a phone OTP for ${purposeLabel}. SMS delivery is not enabled yet, so this copy is sent to your email.</p>
+            <p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:12px 0;">${otp}</p>
+            <p>This code expires in <strong>${Math.floor(ttl / 60)} minutes</strong>.</p>
             <p>If you did not request this, please ignore this email.</p>
           </div>
         `,

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Server, ServerOptions } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
+import { SocketStateService } from './socket-state.service';
 import { RedisService } from '../redis/redis.service';
 import * as crypto from 'crypto';
 
@@ -19,6 +20,8 @@ type SocketWithAuthData = {
     permissions?: string[];
   };
 };
+
+type AuthenticatedSocket = import('socket.io').Socket & SocketWithAuthData;
 
 export class SocketIoAdapter extends IoAdapter {
   private readonly logger = new Logger(SocketIoAdapter.name);
@@ -56,7 +59,55 @@ export class SocketIoAdapter extends IoAdapter {
       void this.authenticateSocket(socket, next);
     });
 
+    const socketState = this.app.get(SocketStateService, { strict: false });
+
+    server.on(
+      'connection',
+      (socket: AuthenticatedSocket) => {
+        void this.handleSocketConnected(socketState, socket);
+        socket.on('disconnect', () => {
+          void this.handleSocketDisconnected(socketState, socket);
+        });
+      },
+    );
+
     return server;
+  }
+
+  private async handleSocketConnected(
+    socketState: SocketStateService,
+    socket: AuthenticatedSocket,
+  ): Promise<void> {
+    const userId = socket.data.userId;
+    if (!userId) {
+      return;
+    }
+
+    const { becameOnline } = await socketState.addSocket(
+      userId,
+      socket,
+    );
+
+    if (becameOnline) {
+      socket.broadcast.emit('user_online', {
+        userId,
+        at: new Date().toISOString(),
+      });
+    }
+  }
+
+  private async handleSocketDisconnected(
+    socketState: SocketStateService,
+    socket: AuthenticatedSocket,
+  ): Promise<void> {
+    const { userId, becameOffline } = await socketState.removeSocket(socket.id);
+
+    if (userId && becameOffline) {
+      socket.broadcast.emit('user_offline', {
+        userId,
+        at: new Date().toISOString(),
+      });
+    }
   }
 
   private async authenticateSocket(

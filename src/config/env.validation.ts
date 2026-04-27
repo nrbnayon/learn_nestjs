@@ -68,6 +68,9 @@ export const envValidationSchema = Joi.object({
   // Socket
   SOCKET_CORS_ORIGIN: Joi.string().default('http://localhost:5173'),
 
+  // OAuth
+  GOOGLE_CLIENT_ID: Joi.string().optional(),
+
   // Seed admin
   ADMIN_NAME: Joi.string().optional(),
   ADMIN_EMAIL: Joi.string().email().optional(),

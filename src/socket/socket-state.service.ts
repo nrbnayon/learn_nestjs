@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../database/prisma.service';
 import { Socket } from 'socket.io';
 import { RedisService } from '../redis/redis.service';
 
@@ -6,7 +7,10 @@ import { RedisService } from '../redis/redis.service';
 export class SocketStateService {
   private readonly logger = new Logger(SocketStateService.name);
 
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * Map: userId → Set of socket IDs
@@ -20,33 +24,68 @@ export class SocketStateService {
 
   // ── Connection Management ─────────────────────────────────────────────────
 
-  async addSocket(userId: string, socket: Socket): Promise<void> {
+  async addSocket(
+    userId: string,
+    socket: Socket,
+  ): Promise<{ becameOnline: boolean }> {
+    const socketsBefore = this.userSockets.get(userId)?.size ?? 0;
+    const becameOnline = socketsBefore === 0;
+
     if (!this.userSockets.has(userId)) {
       this.userSockets.set(userId, new Set());
     }
     this.userSockets.get(userId).add(socket.id);
     this.socketUser.set(socket.id, userId);
+
+    if (becameOnline) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          isOnline: true,
+          lastSeenAt: null,
+        },
+      });
+    }
+
     await this.redisService.set(`user:${userId}:online`, 'true', 120);
-    await this.redisService.publishJson('presence.events', {
-      event: 'user_online',
-      userId,
-      socketId: socket.id,
-      at: new Date().toISOString(),
-    });
+
+    if (becameOnline) {
+      await this.redisService.publishJson('presence.events', {
+        event: 'user_online',
+        userId,
+        socketId: socket.id,
+        at: new Date().toISOString(),
+      });
+    }
+
     this.logger.debug(`Socket ${socket.id} added for user ${userId}`);
+    return { becameOnline };
   }
 
-  async removeSocket(socketId: string): Promise<string | undefined> {
+  async removeSocket(
+    socketId: string,
+  ): Promise<{ userId?: string; becameOffline: boolean }> {
     const userId = this.socketUser.get(socketId);
-    if (!userId) return undefined;
+    if (!userId) return { becameOffline: false };
 
     this.socketUser.delete(socketId);
 
+    let becameOffline = false;
     const sockets = this.userSockets.get(userId);
     if (sockets) {
       sockets.delete(socketId);
       if (sockets.size === 0) {
+        becameOffline = true;
         this.userSockets.delete(userId);
+
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            isOnline: false,
+            lastSeenAt: new Date(),
+          },
+        });
+
         await this.redisService.del(`user:${userId}:online`);
         await this.redisService.publishJson('presence.events', {
           event: 'user_offline',
@@ -59,7 +98,7 @@ export class SocketStateService {
         );
       }
     }
-    return userId;
+    return { userId, becameOffline };
   }
 
   // ── Query Helpers ─────────────────────────────────────────────────────────

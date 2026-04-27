@@ -1,14 +1,11 @@
 import {
   ConnectedSocket,
   MessageBody,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { SOCKET_EVENTS } from '../../common/constants/events.constant';
-import { SocketStateService } from '../../socket/socket-state.service';
 import { ChatService } from './chat.service';
 import { SendChatMessageDto } from './dto/send-chat-message.dto';
 
@@ -16,27 +13,8 @@ import { SendChatMessageDto } from './dto/send-chat-message.dto';
   namespace: '/chat',
   cors: { origin: true, credentials: true },
 })
-export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  constructor(
-    private readonly socketState: SocketStateService,
-    private readonly chatService: ChatService,
-  ) {}
-
-  async handleConnection(client: Socket): Promise<void> {
-    const socketData = client as unknown as { data?: { userId?: string } };
-    const userId = socketData.data?.userId;
-    if (userId) {
-      await this.socketState.addSocket(userId, client);
-      client.broadcast.emit('user_online', { userId });
-    }
-  }
-
-  async handleDisconnect(client: Socket): Promise<void> {
-    const userId = await this.socketState.removeSocket(client.id);
-    if (userId) {
-      client.broadcast.emit('user_offline', { userId });
-    }
-  }
+export class ChatGateway {
+  constructor(private readonly chatService: ChatService) {}
 
   @SubscribeMessage(SOCKET_EVENTS.SEND_MESSAGE)
   handleSendMessage(
