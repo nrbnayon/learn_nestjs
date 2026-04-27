@@ -196,7 +196,7 @@ export class AuthController {
 
   @Public()
   @Post('reset-password')
-  @ResponseMessage('Password reset successfully')
+  @ResponseMessage('Password reset successfully. Now you can login.')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }

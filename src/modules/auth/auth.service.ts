@@ -414,7 +414,7 @@ export class AuthService {
 
     await this.deleteOtpPayload(stored);
 
-    if (purpose === 'account_verification') {
+    if (stored.purpose === 'account_verification') {
       const updateData: Record<string, unknown> = {};
 
       if (stored.channel === 'email') {
@@ -432,6 +432,11 @@ export class AuthService {
         where: { id: user.id },
         data: updateData,
       });
+
+      // Update the user object in memory so subsequent login logic works if we decide to return tokens instead of a message.
+      user.status = 'ACTIVE';
+      if (stored.channel === 'email') user.isEmailVerified = true;
+      if (stored.channel === 'phone') user.isPhoneVerified = true;
 
       await this.audit(
         'auth.user.verified',
@@ -453,7 +458,7 @@ export class AuthService {
       };
     }
 
-    if (purpose === 'password_reset') {
+    if (stored.purpose === 'password_reset') {
       const resetToken = this.jwtHelper.generateSecureToken();
       const resetExpires = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
 
@@ -1416,6 +1421,10 @@ export class AuthService {
     identifier: string,
     tenantId: string | null,
   ): Promise<void> {
+    if (process.env.NODE_ENV !== 'production') {
+      return;
+    }
+
     const blockKey = this.otpBlockKey(purpose, identifier, tenantId);
     const isBlocked = await this.redisService.exists(blockKey);
 
@@ -1435,6 +1444,10 @@ export class AuthService {
     tenantId: string | null,
     ttl: number,
   ): Promise<void> {
+    if (process.env.NODE_ENV !== 'production') {
+      return;
+    }
+
     const key = this.otpResendKey(purpose, identifier, tenantId);
     const attempts = await this.redisService.incr(key);
 
@@ -1462,6 +1475,10 @@ export class AuthService {
     identifier: string,
     tenantId: string | null,
   ): Promise<void> {
+    if (process.env.NODE_ENV !== 'production') {
+      return;
+    }
+
     const key = this.otpInvalidAttemptKey(purpose, identifier, tenantId);
     const attempts = await this.redisService.incr(key);
 
