@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "50e0379b-6bc9-46a8-ad11-3ee561336132",
     "name": "NestJS Auth Platform",
-    "description": "Collection for testing the auth platform, tenant, RBAC, OTP, sessions, audit, and OAuth APIs.",
+    "description": "Collection for testing the auth platform, tenant, RBAC, OTP, sessions, audit, OAuth APIs, and the realtime Socket.IO namespaces for /chat and /presence. Presence is tracked via authenticated WebSocket connections plus heartbeat refreshes.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "44860391"
   },
@@ -558,6 +558,62 @@
       ]
     },
     {
+      "name": "Realtime Socket.IO",
+      "description": "Use these requests in Postman as Socket.IO tabs. Connect with the Authorization header set to Bearer {{accessToken}}. The app uses the /chat namespace for messaging and /presence for online/offline tracking plus heartbeat refreshes.",
+      "item": [
+        {
+          "name": "Connect to /chat",
+          "description": "Open this as a Socket.IO request. Use it for room joins, send-message events, typing, and chat delivery on the /chat namespace.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "ws://127.0.0.1:3001/chat",
+              "protocol": "ws",
+              "host": [
+                "127.0.0.1"
+              ],
+              "port": "3001",
+              "path": [
+                "chat"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Connect to /presence",
+          "description": "Open this as a Socket.IO request. Use it to receive user:online, user:offline, and presence:update events. Emit presence:heartbeat every {{presenceHeartbeatMs}} milliseconds.",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "ws://127.0.0.1:3001/presence",
+              "protocol": "ws",
+              "host": [
+                "127.0.0.1"
+              ],
+              "port": "3001",
+              "path": [
+                "presence"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Admin",
       "item": [
         {
@@ -896,6 +952,22 @@
     {
       "key": "baseUrl",
       "value": "http://localhost:3001/api/v1"
+    },
+    {
+      "key": "chatWsUrl",
+      "value": "http://127.0.0.1:3001/chat"
+    },
+    {
+      "key": "presenceWsUrl",
+      "value": "http://127.0.0.1:3001/presence"
+    },
+    {
+      "key": "socketIoPath",
+      "value": "/socket.io"
+    },
+    {
+      "key": "presenceHeartbeatMs",
+      "value": "30000"
     },
     {
       "key": "tenantId",
