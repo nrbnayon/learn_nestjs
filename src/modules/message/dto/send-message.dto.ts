@@ -1,23 +1,81 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsJSON, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  // IsUUID,
+  // MinLength,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { MessageType } from '@prisma/client';
+
+export class MessageAttachmentDto {
+  @ApiProperty({ example: 'https://example.com/file.jpg' })
+  @IsString()
+  url: string;
+
+  @ApiProperty({ example: 'image.jpg' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ example: 'image/jpeg' })
+  @IsString()
+  mimeType: string;
+
+  @ApiProperty({ example: 1024 })
+  @IsInt()
+  size: number;
+
+  @ApiPropertyOptional({ example: 800 })
+  @IsOptional()
+  @IsInt()
+  width?: number;
+
+  @ApiPropertyOptional({ example: 600 })
+  @IsOptional()
+  @IsInt()
+  height?: number;
+
+  @ApiPropertyOptional({
+    example: 120,
+    description: 'Duration in seconds for audio/video',
+  })
+  @IsOptional()
+  @IsInt()
+  duration?: number;
+}
 
 export class SendMessageDto {
-  @ApiProperty({ example: 'room_123' })
+  @ApiProperty({ example: 'room-uuid' })
   @IsString()
   roomId: string;
 
-  @ApiProperty({ example: 'Hello world' })
-  @IsString()
-  @MinLength(1)
-  content: string;
-
-  @ApiPropertyOptional({ example: 'TEXT' })
+  @ApiPropertyOptional({ example: 'Hello world' })
   @IsOptional()
   @IsString()
-  type?: string;
+  content?: string;
 
-  @ApiPropertyOptional({ example: { replyToId: 'message_1' } })
+  @ApiPropertyOptional({
+    example: 'TEXT',
+    enum: MessageType,
+    default: MessageType.TEXT,
+  })
   @IsOptional()
-  @IsJSON()
-  metadata?: string;
+  @IsEnum(MessageType)
+  type?: MessageType;
+
+  @ApiPropertyOptional({ example: 'message-uuid-to-reply-to' })
+  @IsOptional()
+  @IsString()
+  replyToId?: string;
+
+  @ApiPropertyOptional({ type: [MessageAttachmentDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MessageAttachmentDto)
+  attachments?: MessageAttachmentDto[];
 }
