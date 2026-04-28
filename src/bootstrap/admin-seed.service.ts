@@ -23,6 +23,15 @@ export class AdminSeedService implements OnModuleInit {
       return;
     }
 
+    // Reset stuck online statuses on startup (important for development hot-reloads)
+    await this.prisma.user.updateMany({
+      where: { isOnline: true },
+      data: { isOnline: false },
+    });
+    this.logger.log(
+      'Presence status cleaned up: all users set to offline on startup',
+    );
+
     const adminName = this.configService.get<string>('seed.adminName')?.trim();
     const adminEmail = this.configService
       .get<string>('seed.adminEmail')

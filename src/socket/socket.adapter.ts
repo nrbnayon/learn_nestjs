@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-base-to-string */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { INestApplicationContext, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IoAdapter } from '@nestjs/platform-socket.io';
@@ -60,19 +62,35 @@ export class SocketIoAdapter extends IoAdapter {
     const server = super.createIOServer(port, serverOptions) as Server;
     this.socketServer = server;
 
-    // JWT authentication middleware
-    server.use((socket: AuthenticatedSocket, next) => {
-      void this.authenticateSocket(socket, next);
-    });
-
     const socketState = this.app.get(SocketStateService, { strict: false });
 
-    server.on('connection', (socket: AuthenticatedSocket) => {
-      void this.handleSocketConnected(socketState, socket);
-      socket.on('disconnect', () => {
-        void this.handleSocketDisconnected(socketState, socket);
+    // Helper to attach logic to a namespace
+    const setupNamespace = (namespace: {
+      use: (
+        fn: (socket: AuthenticatedSocket, next: (err?: Error) => void) => void,
+      ) => void;
+      on: (event: string, fn: (socket: AuthenticatedSocket) => void) => void;
+    }) => {
+      namespace.use(
+        (socket: AuthenticatedSocket, next: (err?: Error) => void) => {
+          void this.authenticateSocket(socket, next);
+        },
+      );
+
+      namespace.on('connection', (socket: AuthenticatedSocket) => {
+        void this.handleSocketConnected(socketState, socket);
+
+        socket.on('disconnect', () => {
+          void this.handleSocketDisconnected(socketState, socket);
+        });
       });
-    });
+    };
+
+    // Apply to Root namespace
+    setupNamespace(server);
+
+    // Apply to all other dynamic namespaces (like /chat, /presence)
+    setupNamespace(server.of(/.*/));
 
     return server;
   }
@@ -81,33 +99,38 @@ export class SocketIoAdapter extends IoAdapter {
     socketState: SocketStateService,
     socket: AuthenticatedSocket,
   ): Promise<void> {
-    const userId = socket.data.userId;
-    if (!userId) {
-      return;
-    }
-
-    const presenceUserId = String(userId);
-
-    const { becameOnline } = await socketState.addSocket(
-      presenceUserId,
-      socket,
-    );
-
-    if (becameOnline) {
-      const presenceNs = this.socketServer?.of('/presence');
-      if (presenceNs) {
-        presenceNs.emit(SOCKET_EVENTS.USER_ONLINE, {
-          userId: presenceUserId,
-          socketId: socket.id,
-          at: new Date().toISOString(),
-        });
-      } else {
-        socket.broadcast.emit(SOCKET_EVENTS.USER_ONLINE, {
-          userId: presenceUserId,
-          socketId: socket.id,
-          at: new Date().toISOString(),
-        });
+    try {
+      const userId = socket.data.userId;
+      if (!userId) {
+        this.logger.warn(
+          `Socket ${socket.id} connected but userId is missing in data`,
+        );
+        return;
       }
+
+      const presenceUserId = String(userId);
+      const { becameOnline } = await socketState.addSocket(
+        presenceUserId,
+        socket,
+      );
+
+      if (becameOnline) {
+        this.logger.log(`User ${presenceUserId} is now online`);
+        const presenceNs = this.socketServer?.of('/presence');
+        if (presenceNs) {
+          presenceNs.emit(SOCKET_EVENTS.USER_ONLINE, {
+            userId: presenceUserId,
+            socketId: socket.id,
+            at: new Date().toISOString(),
+          });
+        }
+      }
+      this.logger.log(
+        `Socket ${socket.id} connected for user ${presenceUserId}`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error handling socket connection: ${message}`);
     }
   }
 
@@ -115,24 +138,26 @@ export class SocketIoAdapter extends IoAdapter {
     socketState: SocketStateService,
     socket: AuthenticatedSocket,
   ): Promise<void> {
-    const { userId, becameOffline } = await socketState.removeSocket(socket.id);
+    try {
+      const { userId, becameOffline } = await socketState.removeSocket(
+        socket.id,
+      );
 
-    if (userId && becameOffline) {
-      const presenceUserId = String(userId);
-      const presenceNs = this.socketServer?.of('/presence');
-      if (presenceNs) {
-        presenceNs.emit(SOCKET_EVENTS.USER_OFFLINE, {
-          userId: presenceUserId,
-          socketId: socket.id,
-          at: new Date().toISOString(),
-        });
-      } else {
-        socket.broadcast.emit(SOCKET_EVENTS.USER_OFFLINE, {
-          userId: presenceUserId,
-          socketId: socket.id,
-          at: new Date().toISOString(),
-        });
+      if (userId && becameOffline) {
+        const presenceUserId = String(userId);
+        this.logger.log(`User ${presenceUserId} is now offline`);
+        const presenceNs = this.socketServer?.of('/presence');
+        if (presenceNs) {
+          presenceNs.emit(SOCKET_EVENTS.USER_OFFLINE, {
+            userId: presenceUserId,
+            socketId: socket.id,
+            at: new Date().toISOString(),
+          });
+        }
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error handling socket disconnection: ${message}`);
     }
   }
 
@@ -144,9 +169,13 @@ export class SocketIoAdapter extends IoAdapter {
       const handshake = socket.handshake as SocketHandshake;
       const token =
         handshake.auth?.token ??
-        handshake.headers?.authorization?.replace('Bearer ', '');
+        handshake.headers?.authorization?.replace('Bearer ', '') ??
+        (handshake.headers as Record<string, any>)?.token;
 
-      if (!token?.trim()) {
+      if (!token || typeof token !== 'string' || !token.trim()) {
+        this.logger.warn(
+          `Authentication failed: Token missing for socket ${socket.id}`,
+        );
         return next(new Error('Authentication token missing'));
       }
 
@@ -171,10 +200,14 @@ export class SocketIoAdapter extends IoAdapter {
         `blacklist:access:${hash}`,
       );
       if (isBlacklisted) {
+        this.logger.warn(
+          `Authentication failed: Token blacklisted for user ${payload.sub}`,
+        );
         return next(new Error('Token has been revoked'));
       }
 
       if (!payload?.sub) {
+        this.logger.warn(`Authentication failed: No sub in payload`);
         return next(new Error('Invalid token payload'));
       }
 
@@ -183,7 +216,7 @@ export class SocketIoAdapter extends IoAdapter {
       socket.data.roles = payload.roles ?? [];
       socket.data.permissions = payload.permissions ?? [];
 
-      this.logger.debug(`Socket authenticated: userId=${payload.sub}`);
+      this.logger.log(`Socket authenticated: userId=${payload.sub}`);
       next();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
