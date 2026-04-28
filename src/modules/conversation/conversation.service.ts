@@ -12,7 +12,7 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 // ── Shared select fragment ────────────────────────────────────────────────────
 const memberSelect = {
   id: true,
-  isAdmin: true,
+  isChatAdmin: true,
   isMuted: true,
   joinedAt: true,
   lastReadAt: true,
@@ -120,7 +120,7 @@ export class ConversationService {
         members: {
           create: allMemberIds.map((userId) => ({
             userId,
-            isAdmin: userId === creatorId,
+            isChatAdmin: userId === creatorId,
           })),
         },
       },
@@ -256,7 +256,7 @@ export class ConversationService {
     const member = room.members.find((m) => m.user.id === requesterId);
     if (!member)
       throw new ForbiddenException('You are not a member of this conversation');
-    if (!member.isAdmin)
+    if (!member.isChatAdmin)
       throw new ForbiddenException('Only group admins can perform this action');
 
     return room;

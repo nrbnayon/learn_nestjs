@@ -56,8 +56,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage(SOCKET_EVENTS.JOIN_ROOM)
   async handleJoinRoom(
     @ConnectedSocket() client: ChatSocket,
-    @MessageBody() roomId: string,
+    @MessageBody() body: string | { id: string },
   ) {
+    const roomId = typeof body === 'string' ? body : body.id;
     const userId = client.data.userId;
     this.logger.log(`[DEBUG] User ${userId} joining room: ${roomId}`);
 
@@ -81,8 +82,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage(SOCKET_EVENTS.LEAVE_ROOM)
   async handleLeaveRoom(
     @ConnectedSocket() client: ChatSocket,
-    @MessageBody() roomId: string,
+    @MessageBody() body: string | { id: string },
   ) {
+    const roomId = typeof body === 'string' ? body : body.id;
     const userId = client.data.userId;
     this.logger.log(`[DEBUG] User ${userId} leaving room: ${roomId}`);
     await client.leave(roomId);
@@ -124,8 +126,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage(SOCKET_EVENTS.TYPING_START)
   handleTypingStart(
     @ConnectedSocket() client: ChatSocket,
-    @MessageBody() roomId: string,
+    @MessageBody() body: string | { id: string },
   ) {
+    const roomId = typeof body === 'string' ? body : body.id;
     const userId = client.data.userId;
     this.logger.debug(
       `[DEBUG] User ${userId} started typing in room ${roomId}`,
@@ -140,8 +143,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage(SOCKET_EVENTS.TYPING_STOP)
   handleTypingStop(
     @ConnectedSocket() client: ChatSocket,
-    @MessageBody() roomId: string,
+    @MessageBody() body: string | { id: string },
   ) {
+    const roomId = typeof body === 'string' ? body : body.id;
     const userId = client.data.userId;
     this.logger.debug(
       `[DEBUG] User ${userId} stopped typing in room ${roomId}`,

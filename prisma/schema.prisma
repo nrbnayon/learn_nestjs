@@ -270,7 +270,7 @@ model RoomMember {
   id          String    @id @default(cuid())
   roomId      String
   userId      String
-  isAdmin     Boolean   @default(false)
+  isChatAdmin Boolean   @default(false)
   isMuted     Boolean   @default(false)
   mutedUntil  DateTime?
   joinedAt    DateTime  @default(now())
