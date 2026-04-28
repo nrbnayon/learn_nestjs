@@ -6,19 +6,28 @@ import {
   Param,
   Post,
   Query,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { MessageService } from './message.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ReadMessageDto } from './dto/read-message.dto';
+import type { MulterFile } from '../../shared/storage.service';
 
 @ApiTags('messages')
-@UseGuards(AuthGuard)
 @ApiBearerAuth()
+@UseGuards(AuthGuard)
 @Controller('messages')
 export class MessageController {
   constructor(private readonly messageService: MessageService) {}
@@ -41,13 +50,16 @@ export class MessageController {
 
   @Post()
   @ApiOperation({ summary: 'Send a message (via HTTP)' })
+  @ApiConsumes('multipart/form-data')
   @ResponseMessage('Message sent')
+  @UseInterceptors(FilesInterceptor('files', 10))
   sendMessage(
     @CurrentUser('id')
     userId: string,
     @Body() dto: SendMessageDto,
+    @UploadedFiles() files: unknown[] = [],
   ) {
-    return this.messageService.sendMessage(userId, dto);
+    return this.messageService.sendMessage(userId, dto, files as MulterFile[]);
   }
 
   @Post('read')

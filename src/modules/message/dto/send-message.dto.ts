@@ -13,6 +13,11 @@ import { Type } from 'class-transformer';
 import { MessageType } from '@prisma/client';
 
 export class MessageAttachmentDto {
+  @ApiPropertyOptional({ example: 'messages/uuid.jpg' })
+  @IsOptional()
+  @IsString()
+  key?: string;
+
   @ApiProperty({ example: 'https://example.com/file.jpg' })
   @IsString()
   url: string;

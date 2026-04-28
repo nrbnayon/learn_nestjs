@@ -1,14 +1,14 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
-  BadRequestException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
-import * as path from 'path';
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
+import * as path from 'path';
 
 export interface UploadedFile {
   url: string;
@@ -78,6 +78,20 @@ export class StorageService {
     );
   }
 
+  async uploadFiles(
+    files: MulterFile[],
+    subfolder = '',
+  ): Promise<UploadedFile[]> {
+    if (!files.length) return [];
+
+    const uploadedFiles: UploadedFile[] = [];
+    for (const file of files) {
+      uploadedFiles.push(await this.uploadFile(file, subfolder));
+    }
+
+    return uploadedFiles;
+  }
+
   async uploadAvatar(file: MulterFile): Promise<string> {
     if (!ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
       throw new UnsupportedMediaTypeException(
@@ -88,8 +102,11 @@ export class StorageService {
     return result.url;
   }
 
-  async deleteFile(key: string): Promise<void> {
-    const filePath = path.join(this.uploadDir, key);
+  async deleteFile(keyOrUrl: string): Promise<void> {
+    const normalizedKey = this.normalizeKey(keyOrUrl);
+    if (!normalizedKey) return;
+
+    const filePath = path.join(this.uploadDir, normalizedKey);
     try {
       await fsp.unlink(filePath);
       this.logger.debug(`File deleted: ${filePath}`);
@@ -99,13 +116,20 @@ export class StorageService {
     }
   }
 
+  async deleteFiles(keys: Array<string | null | undefined>): Promise<void> {
+    await Promise.all(keys.map((key) => (key ? this.deleteFile(key) : null)));
+  }
+
   private async uploadToLocal(
     file: MulterFile,
     folder: string,
   ): Promise<UploadedFile> {
     const ext = path.extname(file.originalname).toLowerCase();
     const filename = `${uuidv4()}${ext}`;
-    const key = path.join(folder, filename).replace(/\\/g, '/');
+    const key = [folder, filename]
+      .filter(Boolean)
+      .join('/')
+      .replace(/\\/g, '/');
     const filePath = path.join(this.uploadDir, key);
     await fsp.writeFile(filePath, file.buffer);
     this.logger.debug(`File saved: ${filePath}`);
@@ -136,5 +160,21 @@ export class StorageService {
     if (ALLOWED_VIDEO_TYPES.includes(mimeType)) return 'videos';
     if (ALLOWED_AUDIO_TYPES.includes(mimeType)) return 'audio';
     return 'documents';
+  }
+
+  private normalizeKey(keyOrUrl: string): string {
+    const withoutHost = keyOrUrl.replace(/^https?:\/\/[^/]+/i, '');
+    const withoutPrefix = withoutHost
+      .replace(/^\/+/, '')
+      .replace(/^uploads\//i, '')
+      .replace(/^uploads\\/i, '')
+      .replace(/\\/g, '/');
+
+    const normalized = path.posix.normalize(withoutPrefix);
+    if (!normalized || normalized === '.' || normalized.startsWith('..')) {
+      return '';
+    }
+
+    return normalized;
   }
 }
