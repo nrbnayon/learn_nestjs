@@ -128,6 +128,10 @@ export class SocketIoAdapter extends IoAdapter {
       this.logger.log(
         `Socket ${socket.id} connected for user ${presenceUserId}`,
       );
+      const stats = socketState.getStats();
+      this.logger.log(
+        `Current State: ${stats.onlineUsers} users online across ${stats.totalSockets} sockets`,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error handling socket connection: ${message}`);
@@ -155,6 +159,11 @@ export class SocketIoAdapter extends IoAdapter {
           });
         }
       }
+      this.logger.log(`Socket ${socket.id} disconnected`);
+      const stats = socketState.getStats();
+      this.logger.log(
+        `Current State: ${stats.onlineUsers} users online across ${stats.totalSockets} sockets`,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Error handling socket disconnection: ${message}`);
