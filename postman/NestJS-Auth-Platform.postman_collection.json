@@ -26,46 +26,6 @@
       ]
     },
     {
-      "name": "Tenants",
-      "item": [
-        {
-          "name": "Create Tenant",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"My Test Company\",\n  \"domain\": \"www.example.com\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/tenants",
-              "host": ["{{baseUrl}}"],
-              "path": ["tenants"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "List Tenants",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/tenants",
-              "host": ["{{baseUrl}}"],
-              "path": ["tenants"]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
       "name": "Auth",
       "item": [
         {
@@ -377,6 +337,81 @@
       ]
     },
     {
+      "name": "OAuth",
+      "item": [
+        {
+          "name": "1. Exchange Google Authorization Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"4/0AY0e-g7...\",\n  \"redirectUri\": \"http://localhost:3001/auth/google/callback\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/oauth/google/callback",
+              "host": ["{{baseUrl}}"],
+              "path": ["oauth", "google", "callback"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Login with Google",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"google-id-token-from-frontend\",\n  \"tenantId\": \"\",\n  \"accessToken\": \"google-access-token\",\n  \"refreshToken\": \"google-refresh-token\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/oauth/google",
+              "host": ["{{baseUrl}}"],
+              "path": ["oauth", "google"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Connect Provider Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"google\",\n  \"idToken\": \"google-id-token\",\n  \"accessToken\": \"google-access-token\",\n  \"refreshToken\": \"google-refresh-token\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/oauth/connect",
+              "host": ["{{baseUrl}}"],
+              "path": ["oauth", "connect"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Users",
       "item": [
         {
@@ -419,48 +454,6 @@
               "raw": "{{baseUrl}}/users/me",
               "host": ["{{baseUrl}}"],
               "path": ["users", "me"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "List Users",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/users?search=john",
-              "host": ["{{baseUrl}}"],
-              "path": ["users"],
-              "query": [
-                {
-                  "key": "search",
-                  "value": "john"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get User by ID",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/users/{{userId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", "{{userId}}"]
             }
           },
           "response": []
@@ -565,285 +558,302 @@
       ]
     },
     {
-      "name": "OAuth",
+      "name": "Admin",
       "item": [
         {
-          "name": "1. Exchange Google Authorization Code",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"code\": \"4/0AY0e-g7...\",\n  \"redirectUri\": \"http://localhost:3001/auth/google/callback\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/oauth/google/callback",
-              "host": ["{{baseUrl}}"],
-              "path": ["oauth", "google", "callback"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "2. Login with Google",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"idToken\": \"google-id-token-from-frontend\",\n  \"tenantId\": \"\",\n  \"accessToken\": \"google-access-token\",\n  \"refreshToken\": \"google-refresh-token\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/oauth/google",
-              "host": ["{{baseUrl}}"],
-              "path": ["oauth", "google"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "3. Connect Provider Account",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"provider\": \"google\",\n  \"idToken\": \"google-id-token\",\n  \"accessToken\": \"google-access-token\",\n  \"refreshToken\": \"google-refresh-token\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/oauth/connect",
-              "host": ["{{baseUrl}}"],
-              "path": ["oauth", "connect"]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Permissions",
-      "item": [
-        {
-          "name": "Create Permission",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"action\": \"read\",\n  \"subject\": \"user\",\n  \"description\": \"Can read user profiles\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/permissions",
-              "host": ["{{baseUrl}}"],
-              "path": ["permissions"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "List Permissions",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/permissions",
-              "host": ["{{baseUrl}}"],
-              "path": ["permissions"]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Roles",
-      "item": [
-        {
-          "name": "Create Role",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"ADMIN\",\n  \"tenantId\": \"{{tenantId}}\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/roles",
-              "host": ["{{baseUrl}}"],
-              "path": ["roles"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "List Roles",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/roles",
-              "host": ["{{baseUrl}}"],
-              "path": ["roles"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Assign Permission to Role",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/roles/{{roleId}}/permissions/{{permissionId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["roles", "{{roleId}}", "permissions", "{{permissionId}}"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Assign Role to User",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/roles/{{roleId}}/users/{{userId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["roles", "{{roleId}}", "users", "{{userId}}"]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Sessions",
-      "item": [
-        {
-          "name": "List User Sessions",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/sessions/users/{{userId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["sessions", "users", "{{userId}}"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Revoke All User Sessions",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/sessions/users/{{userId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["sessions", "users", "{{userId}}"]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Audit",
-      "item": [
-        {
-          "name": "List Audit Logs",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/audit?limit=50&offset=0",
-              "host": ["{{baseUrl}}"],
-              "path": ["audit"],
-              "query": [
-                {
-                  "key": "limit",
-                  "value": "50"
+          "name": "Tenants",
+          "item": [
+            {
+              "name": "Create Tenant",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"My Test Company\",\n  \"domain\": \"www.example.com\"\n}"
                 },
-                {
-                  "key": "offset",
-                  "value": "0"
+                "url": {
+                  "raw": "{{baseUrl}}/tenants",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants"]
                 }
-              ]
+              },
+              "response": []
+            },
+            {
+              "name": "List Tenants",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/tenants",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants"]
+                }
+              },
+              "response": []
             }
-          },
-          "response": []
+          ]
+        },
+        {
+          "name": "User Management",
+          "item": [
+            {
+              "name": "List Users",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users?search=john",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users"],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "john"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get User by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/users/{{userId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["users", "{{userId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Permissions",
+          "item": [
+            {
+              "name": "Create Permission",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"action\": \"read\",\n  \"subject\": \"user\",\n  \"description\": \"Can read user profiles\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/permissions",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["permissions"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List Permissions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/permissions",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["permissions"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Roles",
+          "item": [
+            {
+              "name": "Create Role",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"ADMIN\",\n  \"tenantId\": \"{{tenantId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/roles",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["roles"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List Roles",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/roles",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["roles"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Assign Permission to Role",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/roles/{{roleId}}/permissions/{{permissionId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["roles", "{{roleId}}", "permissions", "{{permissionId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Assign Role to User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/roles/{{roleId}}/users/{{userId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["roles", "{{roleId}}", "users", "{{userId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Sessions Management",
+          "item": [
+            {
+              "name": "List User Sessions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/sessions/users/{{userId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["sessions", "users", "{{userId}}"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Revoke All User Sessions",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/sessions/users/{{userId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["sessions", "users", "{{userId}}"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Audit Logs",
+          "item": [
+            {
+              "name": "List Audit Logs",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/audit?limit=50&offset=0",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["audit"],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
         }
       ]
     }

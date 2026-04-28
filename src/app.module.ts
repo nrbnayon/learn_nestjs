@@ -20,6 +20,7 @@ import { ConversationModule } from './modules/conversation/conversation.module';
 import { MessageModule } from './modules/message/message.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { CallModule } from './modules/call/call.module';
+import { PresenceModule } from './modules/presence/presence.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { HealthModule } from './modules/health/health.module';
@@ -72,6 +73,7 @@ import { AdminSeedService } from './bootstrap/admin-seed.service';
     ConversationModule,
     MessageModule,
     ChatModule,
+    PresenceModule,
     CallModule,
     NotificationModule,
     UploadModule,

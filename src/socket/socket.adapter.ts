@@ -5,6 +5,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Server, ServerOptions } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { SocketStateService } from './socket-state.service';
+import { SOCKET_EVENTS } from '../common/constants/events.constant';
 import { RedisService } from '../redis/redis.service';
 import * as crypto from 'crypto';
 
@@ -87,12 +88,25 @@ export class SocketIoAdapter extends IoAdapter {
       userId,
       socket,
     );
-
+    
     if (becameOnline) {
-      socket.broadcast.emit('user_online', {
-        userId,
-        at: new Date().toISOString(),
-      });
+      // Emit presence event to presence namespace so clients subscribed to /presence
+      // receive user online notifications. Falls back to global broadcast when
+      // the namespace is not present.
+      try {
+        const presenceNs = socket.server.of('/presence');
+        presenceNs.emit(SOCKET_EVENTS.USER_ONLINE, {
+          userId,
+          socketId: socket.id,
+          at: new Date().toISOString(),
+        });
+      } catch (err) {
+        socket.broadcast.emit(SOCKET_EVENTS.USER_ONLINE, {
+          userId,
+          socketId: socket.id,
+          at: new Date().toISOString(),
+        });
+      }
     }
   }
 
@@ -103,10 +117,20 @@ export class SocketIoAdapter extends IoAdapter {
     const { userId, becameOffline } = await socketState.removeSocket(socket.id);
 
     if (userId && becameOffline) {
-      socket.broadcast.emit('user_offline', {
-        userId,
-        at: new Date().toISOString(),
-      });
+      try {
+        const presenceNs = socket.server.of('/presence');
+        presenceNs.emit(SOCKET_EVENTS.USER_OFFLINE, {
+          userId,
+          socketId: socket.id,
+          at: new Date().toISOString(),
+        });
+      } catch (err) {
+        socket.broadcast.emit(SOCKET_EVENTS.USER_OFFLINE, {
+          userId,
+          socketId: socket.id,
+          at: new Date().toISOString(),
+        });
+      }
     }
   }
 
