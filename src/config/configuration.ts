@@ -2,7 +2,7 @@ export default () => ({
   app: {
     name: process.env.APP_NAME || 'NestJS Chat Backend',
     nodeEnv: process.env.NODE_ENV || 'development',
-    port: parseInt(process.env.PORT || '3001', 10),
+    port: parseInt(process.env.PORT, 10),
     host: process.env.APP_HOST || '127.0.0.1',
     apiPrefix: process.env.API_PREFIX || 'api/v1',
     baseUrl: process.env.APP_BASE_URL || 'http://localhost:3001',
@@ -78,6 +78,7 @@ export default () => ({
   },
   oauth: {
     googleClientId: process.env.GOOGLE_CLIENT_ID,
+    googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
   },
   seed: {
     adminName: process.env.ADMIN_NAME,

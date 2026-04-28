@@ -70,6 +70,7 @@ export const envValidationSchema = Joi.object({
 
   // OAuth
   GOOGLE_CLIENT_ID: Joi.string().optional(),
+  GOOGLE_CLIENT_SECRET: Joi.string().optional(),
 
   // Seed admin
   ADMIN_NAME: Joi.string().optional(),

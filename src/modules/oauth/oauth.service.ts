@@ -322,4 +322,68 @@ export class OauthService {
       });
     }
   }
+
+  /**
+   * Exchange Google authorization code for tokens (backend-to-backend)
+   * Call this from your frontend after receiving the auth code from Google
+   */
+  async exchangeGoogleAuthCode(code: string, redirectUri: string) {
+    const clientId = this.configService.get<string>('oauth.googleClientId');
+    const clientSecret = this.configService.get<string>(
+      'oauth.googleClientSecret',
+    );
+
+    if (!clientId || !clientSecret) {
+      throw new BadRequestException(
+        'Google OAuth credentials not configured on backend',
+      );
+    }
+
+    if (!code?.trim()) {
+      throw new BadRequestException('Authorization code is required');
+    }
+
+    try {
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code: code.trim(),
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+        }).toString(),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new UnauthorizedException(
+          `Google token exchange failed: ${error}`,
+        );
+      }
+
+      const tokens = (await response.json()) as {
+        access_token: string;
+        refresh_token?: string;
+        id_token?: string;
+        expires_in: number;
+        token_type: string;
+      };
+
+      return {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token ?? null,
+        idToken: tokens.id_token ?? null,
+        expiresIn: tokens.expires_in,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException(
+        'Failed to exchange Google authorization code',
+      );
+    }
+  }
 }

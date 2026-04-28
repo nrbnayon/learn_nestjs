@@ -42,4 +42,16 @@ export class OauthController {
   ) {
     return this.oauthService.connectProvider(userId, dto);
   }
+
+  @Post('google/callback')
+  @ResponseMessage('Google token exchange successful')
+  async exchangeGoogleCode(
+    @Body()
+    dto: {
+      code: string;
+      redirectUri: string;
+    },
+  ) {
+    return this.oauthService.exchangeGoogleAuthCode(dto.code, dto.redirectUri);
+  }
 }
