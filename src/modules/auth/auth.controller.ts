@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { FastifyReply, FastifyRequest } from 'fastify';
+import { Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/roles.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
@@ -42,7 +42,7 @@ export class AuthController {
     @Body() dto: RegisterDto,
     @Headers('x-tenant-id') tenantId?: string,
     @Headers('x-tenant-domain') tenantDomain?: string,
-    @Req() req?: FastifyRequest,
+    @Req() req?: Request,
   ) {
     return this.authService.register(dto, {
       tenantId,
@@ -63,7 +63,7 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Headers('x-tenant-id') tenantId?: string,
     @Headers('x-tenant-domain') tenantDomain?: string,
-    @Req() req?: FastifyRequest,
+    @Req() req?: Request,
   ) {
     return this.authService.login(dto, {
       tenantId,
@@ -94,7 +94,7 @@ export class AuthController {
   verifyOtp(
     @Body() dto: OtpVerifyDto,
     @Headers('x-tenant-domain') tenantDomain?: string,
-    @Req() req?: FastifyRequest,
+    @Req() req?: Request,
   ) {
     return this.authService.verifyOtp(dto, {
       tenantDomain,
@@ -113,7 +113,7 @@ export class AuthController {
   refreshToken(
     @Body() dto: RefreshTokenDto,
     @Headers('x-tenant-id') tenantId?: string,
-    @Req() req?: FastifyRequest,
+    @Req() req?: Request,
   ) {
     return this.authService.refreshTokens(dto, {
       tenantId,
@@ -130,7 +130,7 @@ export class AuthController {
   async verifyEmailFromLink(
     @Query('token') token: string,
     @Query('platform') platform?: 'web' | 'app',
-    @Res() reply?: FastifyReply,
+    @Res() reply?: Response,
   ) {
     if (!token) {
       throw new BadRequestException('token is required');
@@ -160,7 +160,7 @@ export class AuthController {
   }
 
   private redirectVerificationReply(
-    reply: FastifyReply | undefined,
+    reply: Response | undefined,
     redirectBaseUrl: string,
     platform: 'web' | 'app',
     status: 'success' | 'failure',
@@ -177,7 +177,7 @@ export class AuthController {
       redirectUrl.searchParams.set('message', message);
     }
 
-    return reply.status(302).header('Location', redirectUrl.toString()).send();
+    return reply.redirect(302, redirectUrl.toString());
   }
 
   @Public()
@@ -212,7 +212,7 @@ export class AuthController {
   @ApiBearerAuth()
   @Post('logout')
   @ResponseMessage('Logged out successfully. Your session has been terminated.')
-  logout(@CurrentUser('id') userId: string, @Req() req?: FastifyRequest) {
+  logout(@CurrentUser('id') userId: string, @Req() req?: Request) {
     const authHeader = req?.headers?.authorization;
     const accessToken = authHeader?.startsWith('Bearer ')
       ? authHeader.slice(7)

@@ -1,12 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
-import {
-  FastifyAdapter,
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
-import fastifyHelmet from '@fastify/helmet';
-import fastifyCompress from '@fastify/compress';
-import fastifyCookie from '@fastify/cookie';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { CustomValidationPipe } from './common/pipes/validation.pipe';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -15,16 +13,12 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { SocketIoAdapter } from './socket/socket.adapter';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule,
-    new FastifyAdapter(),
-    {
-      bufferLogs: true,
-    },
-  );
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
 
-  const configService = app.get(ConfigService);
-  const reflector = app.get(Reflector);
+  const configService = app.get<ConfigService>(ConfigService);
+  const reflector = app.get<Reflector>(Reflector);
   const port = configService.get<number>('app.port', 3000);
   const host = configService.get<string>('app.host', '127.0.0.1');
   const apiPrefix = configService.get<string>('app.apiPrefix', 'api/v1');
@@ -38,9 +32,10 @@ async function bootstrap() {
     credentials: true,
   });
 
-  await app.register(fastifyHelmet);
-  await app.register(fastifyCompress);
-  await app.register(fastifyCookie);
+  // Standard Express middleware setup
+  app.use(helmet());
+  app.use(compression());
+  app.use(cookieParser());
 
   app.useGlobalPipes(new CustomValidationPipe());
   app.useGlobalFilters(new GlobalExceptionFilter());
@@ -50,6 +45,6 @@ async function bootstrap() {
   );
   app.useWebSocketAdapter(new SocketIoAdapter(app, configService));
 
-  await app.listen({ port, host });
+  await app.listen(port, host);
 }
 void bootstrap();
