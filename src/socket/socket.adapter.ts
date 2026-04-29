@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { SocketStateService } from './socket-state.service';
 import { SOCKET_EVENTS } from '../common/constants/events.constant';
 import { RedisService } from '../redis/redis.service';
+import { SocketEmitterService } from './socket-emitter.service';
 import * as crypto from 'crypto';
 
 type SocketData = {
@@ -63,6 +64,11 @@ export class SocketIoAdapter extends IoAdapter {
     this.socketServer = server;
 
     const socketState = this.app.get(SocketStateService, { strict: false });
+    const socketEmitter = this.app.get(SocketEmitterService, { strict: false });
+
+    // Pass the root server — namespaces are accessed lazily at emit time
+    // so the auth middleware gets applied properly before any namespace is used.
+    socketEmitter.setServer(server);
 
     // Helper to attach logic to a namespace
     const setupNamespace = (namespace: {

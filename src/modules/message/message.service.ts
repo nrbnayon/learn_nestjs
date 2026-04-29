@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import {
   BadRequestException,
   ForbiddenException,
@@ -14,6 +15,8 @@ import {
   StorageService,
   UploadedFile,
 } from '../../shared/storage.service';
+import { SocketEmitterService } from '../../socket/socket-emitter.service';
+import { SOCKET_EVENTS } from '../../common/constants/events.constant';
 // import { MessageStatus } from '@prisma/client';
 
 @Injectable()
@@ -23,12 +26,14 @@ export class MessageService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
+    private readonly socketEmitter: SocketEmitterService,
   ) {}
 
   async sendMessage(
     senderId: string,
     dto: SendMessageDto,
     files: MulterFile[] = [],
+    excludeSocketId?: string,
   ) {
     // Verify user is member of room
     const member = await this.prisma.roomMember.findUnique({
@@ -109,6 +114,21 @@ export class MessageService {
       this.logger.log(
         `Message ${message.id} sent by ${senderId} in room ${dto.roomId}`,
       );
+
+      // BROADCAST: Notify all users in the room via Socket.IO
+      this.socketEmitter.emitToRoom(
+        dto.roomId,
+        SOCKET_EVENTS.NEW_MESSAGE,
+        message,
+        excludeSocketId,
+      );
+
+      this.logger.log(
+        `[DEBUG] Message ${message.id} broadcasted via SocketEmitterService to room ${dto.roomId}${
+          excludeSocketId ? ` (excluding socket ${excludeSocketId})` : ''
+        }`,
+      );
+
       return message;
     } catch (error) {
       await this.cleanupAttachments(attachments);

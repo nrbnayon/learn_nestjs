@@ -13,6 +13,7 @@ import { SOCKET_EVENTS } from '../../common/constants/events.constant';
 import { MessageService } from '../message/message.service';
 import { ConversationService } from '../conversation/conversation.service';
 import { SendMessageDto } from '../message/dto/send-message.dto';
+import { UserService } from '../user/user.service';
 
 interface ChatSocket extends Socket {
   data: {
@@ -33,6 +34,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly messageService: MessageService,
     private readonly conversationService: ConversationService,
+    private readonly userService: UserService,
   ) {}
 
   // ── Connection Handling ───────────────────────────────────────────────────
@@ -104,13 +106,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
 
     try {
-      const message = await this.messageService.sendMessage(userId, dto);
-
-      // Emit to everyone in the room EXCEPT the sender (sender gets it via return)
-      client.to(dto.roomId).emit(SOCKET_EVENTS.NEW_MESSAGE, message);
+      // Pass the client ID to exclude the sender from the broadcast
+      // Since the sender gets the message as the return value (ack)
+      const message = await this.messageService.sendMessage(
+        userId,
+        dto,
+        [],
+        client.id,
+      );
 
       this.logger.log(
-        `[DEBUG] Message ${message.id} broadcasted to room ${dto.roomId}`,
+        `[DEBUG] Message ${message.id} sent via Socket.IO and broadcasted (excluding sender ${client.id})`,
       );
       return message;
     } catch (error) {
@@ -133,10 +139,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.debug(
       `[DEBUG] User ${userId} started typing in room ${roomId}`,
     );
-    client.to(roomId).emit(SOCKET_EVENTS.TYPING_INDICATOR, {
-      roomId,
-      userId,
-      isTyping: true,
+
+    // Fetch user name for better UI
+    void this.userService.getUserById(userId).then((user) => {
+      client.to(roomId).emit(SOCKET_EVENTS.TYPING_INDICATOR, {
+        roomId,
+        userId,
+        userName: user.fullName,
+        isTyping: true,
+      });
     });
   }
 

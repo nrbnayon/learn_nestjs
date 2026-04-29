@@ -5,6 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import { resolve } from 'path';
 import { AppModule } from './app.module';
 import { CustomValidationPipe } from './common/pipes/validation.pipe';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -25,8 +26,12 @@ async function bootstrap() {
   const corsOrigins = configService.get<string[]>('cors.origins') ?? [
     'http://localhost:3000',
   ];
+  const uploadDir = configService.get<string>('storage.uploadDir', 'uploads');
 
   app.setGlobalPrefix(apiPrefix);
+  app.useStaticAssets(resolve(process.cwd(), uploadDir), {
+    prefix: '/uploads',
+  });
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
